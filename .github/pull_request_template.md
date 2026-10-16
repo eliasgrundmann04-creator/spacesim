@@ -14,6 +14,11 @@
 
 **Dateien:** <!-- vollständige Liste; jede, die nicht in der Aufgabe stand, begründen -->
 
+## Testausgabe
+
+<!-- Ausgabe jedes neuen oder geänderten Tests, wörtlich aus dem Lauf, mit allen Zahlen.
+     Sonst: "Keine neuen oder geänderten Tests." -->
+
 ## Prüfung
 
 - [ ] `npm run check` lokal grün
@@ -31,3 +36,5 @@
 ## Offen / Befunde
 
 <!-- Was du bemerkt, aber bewusst nicht angefasst hast. -->
+
+Fixes #<!-- Nummer des Issues -->
