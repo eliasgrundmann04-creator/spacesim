@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.1 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.2 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,7 +24,7 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.1)
+## 2. Aktueller Stand (v0.4.2)
 
 Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 97 Offline-Tests (41 Navigation, 10 Kepler, 19 Orientierung, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
@@ -305,6 +305,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.3 | Stufe 1: freier Flug und Goto als Log-Interpolation, isolierter `src/nav/`-Kern mit Offline-Tests, Zwei-Modi-Kamera mit Multi-Pointer-Touch, `uid` und ankerrelative Geschwindigkeit auf `CelestialBody`, Laufzeit-Selbsttest gegen `dtReal`/`dtSim`-Verwechslung |
 | v0.4 | Quaternion-Orientierung ohne Achsenanschlag (`nav/orientation.ts`), robuste Kachel-Warteschlange (Wachhund + Fallback), framerate-unabhängiger Geschwindigkeitsdeckel, explizite Schub-Totzone; 97 Offline-Tests |
 | v0.4.1 | Umzug auf Agent-Betrieb: Quellbaum statt ZIP im Repo, `AGENTS.md`, CI, Netlify-Vorschau, `tools/contracts.mjs` + `docs/contracts.md` (three-Freiheit transitiv, Dateideckel-Ratsche), Aufgaben 00–06. Testskripte mit `--experimental-strip-types` (sonst scheitern sie unter Node 22.6–22.17), drei verdeckte Typfehler behoben (`npm run build` lief vorher nicht), Präzisionstabelle §3.1 korrigiert, §8/§12 auf Aufgaben und PRs umgestellt |
+| v0.4.2 | Probelauf: doppeltes `formatDistance` auf `src/nav/format.ts` konsolidiert, veraltete Definition aus `src/core/constants.ts` entfernt. |
 
 ---
 

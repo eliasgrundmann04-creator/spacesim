@@ -22,11 +22,3 @@ export const DEG = Math.PI / 180;
 
 /** Unix-Millisekunden der Epoche J2000.0 (2000-01-01 12:00, TT≈UTC hier ausreichend). */
 export const J2000_UNIX_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
-
-export function formatDistance(m: number): string {
-  const a = Math.abs(m);
-  if (a < 1e4) return `${m.toFixed(1)} m`;
-  if (a < 1e10) return `${(m / 1e3).toFixed(1)} km`;
-  if (a < 0.08 * LY) return `${(m / AU).toFixed(3)} AE`;
-  return `${(m / LY).toFixed(3)} Lj`;
-}
