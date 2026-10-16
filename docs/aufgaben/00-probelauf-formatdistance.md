@@ -1,7 +1,7 @@
 ---
 id: 00
 titel: Probelauf — doppeltes formatDistance auflösen
-status: offen
+status: erledigt
 braucht: []
 stufe: —
 tablet: ja

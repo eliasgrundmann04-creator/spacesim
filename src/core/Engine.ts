@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { SceneManager } from './SceneManager';
 import { SimClock } from './SimClock';
-import { formatDistance, LY, EARTH_RADIUS } from './constants';
+import { LY, EARTH_RADIUS } from './constants';
 import { SpaceCamera } from '../camera/SpaceCamera';
 import { UniverseManager } from '../universe/UniverseManager';
 import type { CelestialBody } from '../universe/CelestialBody';
@@ -15,7 +15,7 @@ import { pickBody, screenRay, tapTolerance } from '../nav/picking';
 import type { BodyRef, NavInput } from '../nav/types';
 import { THRUST_EPSILON } from '../nav/types';
 import type { Vec3 } from '../nav/vec';
-import { formatSpeed, formatScale } from '../nav/format';
+import { formatDistance, formatSpeed, formatScale } from '../nav/format';
 import { FlightControls } from '../ui/FlightControls';
 
 /**

@@ -126,7 +126,6 @@
 - `const YEAR`
 - `const DEG`
 - `const J2000_UNIX_MS`
-- `function formatDistance(m: number): string`
 
 ### `math/Vector3d.ts`
 
