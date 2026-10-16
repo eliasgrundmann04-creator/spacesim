@@ -1,0 +1,33 @@
+# Prüft jeden PR und jeden Push auf main mit genau dem Befehl, den auch der Agent lokal ausführt.
+# Jules' CI-Fixer reagiert auf ein Rot hier und bessert seinen eigenen PR nach.
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        # 22.16 = Node in der Jules-VM (Untergrenze, braucht --experimental-strip-types),
+        # 24 = aktuelles LTS
+        node: ['22.16', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run check

@@ -1,0 +1,8 @@
+# Vorschau-Deploys: Netlify baut jeden PR und liefert eine eigene https-Adresse
+# (WebGPU braucht einen sicheren Kontext) — darauf wird auf dem Tablet geprüft.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"

@@ -1,0 +1,60 @@
+{
+  "name": "Sonne",
+  "type": "star",
+  "mass": 1.98892e30,
+  "radius": 6.957e8,
+  "temperature": 5772,
+  "luminosity": 3.828e26,
+  "children": [
+    {
+      "name": "Merkur",
+      "type": "rocky",
+      "mass": 3.3011e23,
+      "radius": 2.4397e6,
+      "orbit": { "a_au": 0.38709893, "e": 0.20563069, "i_deg": 7.00487, "Omega_deg": 48.33167, "omega_deg": 29.12478, "M0_deg": 174.79439 },
+      "terrain": { "amplitude": 0.0035, "frequency": 2.4, "ocean": false, "palette": "gray" }
+    },
+    {
+      "name": "Venus",
+      "type": "rocky",
+      "mass": 4.8675e24,
+      "radius": 6.0518e6,
+      "orbit": { "a_au": 0.72333199, "e": 0.00677323, "i_deg": 3.39471, "Omega_deg": 76.68069, "omega_deg": 54.85229, "M0_deg": 50.44675 },
+      "terrain": { "amplitude": 0.0018, "frequency": 1.8, "ocean": false, "palette": "desert" }
+    },
+    {
+      "name": "Erde",
+      "type": "rocky",
+      "mass": 5.9722e24,
+      "radius": 6.371e6,
+      "orbit": { "a_au": 1.00000261, "e": 0.01671123, "i_deg": 0.00005, "Omega_deg": 0.0, "omega_deg": 102.93768, "M0_deg": 357.52689 },
+      "terrain": { "amplitude": 0.0018, "frequency": 1.6, "ocean": true, "oceanLevel": 0.02, "palette": "earth" },
+      "children": [
+        {
+          "name": "Mond",
+          "type": "rocky",
+          "mass": 7.342e22,
+          "radius": 1.7374e6,
+          "orbit": { "a_au": 0.00257, "e": 0.0549, "i_deg": 5.145, "Omega_deg": 125.08, "omega_deg": 318.15, "M0_deg": 135.27 },
+          "terrain": { "amplitude": 0.0045, "frequency": 2.2, "ocean": false, "palette": "gray" }
+        }
+      ]
+    },
+    {
+      "name": "Mars",
+      "type": "rocky",
+      "mass": 6.4171e23,
+      "radius": 3.3895e6,
+      "orbit": { "a_au": 1.52371034, "e": 0.0933941, "i_deg": 1.84969, "Omega_deg": 49.55954, "omega_deg": 286.49703, "M0_deg": 19.39019 },
+      "terrain": { "amplitude": 0.0055, "frequency": 1.5, "ocean": false, "palette": "red" }
+    },
+    {
+      "name": "Jupiter",
+      "type": "gas",
+      "mass": 1.89813e27,
+      "radius": 6.9911e7,
+      "orbit": { "a_au": 5.202887, "e": 0.04838624, "i_deg": 1.3044, "Omega_deg": 100.47391, "omega_deg": 273.86749, "M0_deg": 19.66796 },
+      "gasPalette": "jovian"
+    }
+  ]
+}
