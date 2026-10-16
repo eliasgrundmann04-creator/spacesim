@@ -35,9 +35,18 @@ Widerspricht eine Aufgabe dem Kanon (§4), löst du das nicht selbst auf: **eska
    Nie einen Test abschwächen, löschen, überspringen oder seine Toleranz lockern, um grün zu werden.
 5. **Version.** `package.json`: Patch +1 je Aufgabe; Minor +1, wenn damit eine Stufe aus §7
    vollständig abgeschlossen ist (Stufe 2 komplett → 0.5.0).
-6. **Abschluss.** Aufgabendatei auf `status: erledigt`, Leitfaden §2/§11 nachführen, PR nach
-   `.github/pull_request_template.md`. Nie direkt auf `main`.
-7. **CI.** Wird der PR-Check rot, beheben — mit derselben Regel wie in Schritt 4.
+6. **Abschluss.** Aufgabendatei auf `status: erledigt`, Leitfaden §2/§11 nachführen. Nie direkt auf `main`.
+7. **PR-Beschreibung.** Die Vorlage `.github/pull_request_template.md` wird bei automatisch
+   erstellten PRs **nicht** eingefügt. Übernimm sie deshalb selbst: jede Überschrift der Vorlage,
+   in derselben Reihenfolge, jede ausgefüllt — auch wenn die Antwort „nicht nötig" lautet.
+   Pflicht sind insbesondere:
+   - die Zeile **Bewertung: erfüllt / nicht erfüllt** mit dem Messwert, an dem das hängt
+   - **Testausgabe:** die Ausgabe jedes neuen oder geänderten Tests mit seinen Zahlen, wörtlich
+     aus dem Lauf kopiert (der Inhaber liest Zahlen, nicht Code)
+   - **Auf dem Tablet prüfen:** nummerierte Schritte — was tippen, was sehen, woran ein Fehler zu
+     erkennen wäre. Bei `tablet: nein` genau: „Nicht nötig — nur three-freie Kerne bzw. Doku geändert."
+   - als letzte Zeile `Fixes #<Nummer des Issues>`, damit sich das Issue beim Merge schließt
+8. **CI.** Wird der PR-Check rot, beheben — mit derselben Regel wie in Schritt 4.
 
 ## Eskalation statt stiller Umplanung (Leitfaden §12.2)
 
@@ -69,7 +78,8 @@ veränderten Ziel weiterarbeiten — auf genau diesem Weg geht das Zielbild verl
 
 ## Nicht anfassen
 
-`AGENTS.md`, `.github/`, `netlify.toml`, Leitfaden §1/§4/§7/§12, die Konfiguration in
+`AGENTS.md`, `SPICKZETTEL.md` (außer eine Aufgabe verlangt es), `.github/`, `netlify.toml`,
+Leitfaden §1/§4/§7/§12, die Konfiguration in
 `tools/contracts.mjs` (Ausnahme: `THREE_FREE` darf wachsen, `CAP_BASELINE` darf schrumpfen —
 der Check sagt, wann). Änderungsbedarf daran → eskalieren.
 

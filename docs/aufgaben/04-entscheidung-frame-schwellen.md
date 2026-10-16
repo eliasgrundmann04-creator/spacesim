@@ -21,12 +21,14 @@ Vorlage, damit die Entscheidung in fünf Minuten auf dem Tablet fällt.
   (Ankerwechsel, ankerrelative Geschwindigkeit, Softmin-Referenzhöhe).
 - Eine Empfehlung mit Begründung, ausdrücklich als Empfehlung markiert.
 - Hysterese ist in jeder Option behandelt (kein Flattern an der Schwelle).
-- Der PR ändert **nur** `docs/leitfaden.md` §9 und diese Aufgabendatei.
+- Der PR ändert **nur** `docs/leitfaden.md` (§9, dazu die Zeile in §11), diese Aufgabendatei und
+  die Version in `package.json`.
 
 ## Dateien
 
-- `docs/leitfaden.md` — nur §9
+- `docs/leitfaden.md` — §9, dazu die Zeile in §11
 - diese Datei — Status
+- `package.json` — nur die Version
 
 ## Hinweise
 
@@ -34,8 +36,10 @@ Vorlage, damit die Entscheidung in fünf Minuten auf dem Tablet fällt.
   `nav/Navigator`, `universe/CelestialBody`.
 - Zahlen statt Adjektive: Größenordnungen der SOI von Erde, Mond, Sonne; Abstände der
   Nachbarsterne; f64-Auflösung an der Schwelle.
-- Status bleibt nach dem PR `offen`, bis der Inhaber im PR-Kommentar entschieden hat. Dann die
-  Entscheidung in §9 als **entschieden** mit Datum eintragen, Status `erledigt`.
+- Status bleibt im PR zunächst `offen`. Der Inhaber entscheidet per PR-Kommentar und merged erst
+  danach. Auf seinen Kommentar hin trägst du die Entscheidung im **selben PR** in §9 als
+  **entschieden** mit Datum ein und setzt den Status auf `erledigt`.
+- Jede Option bekommt einen Buchstaben (A, B, C), damit die Antwort „Option B" eindeutig ist.
 
 ## Nicht-Ziele
 
