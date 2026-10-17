@@ -142,7 +142,7 @@ section('3. Ohne Griff: gleiche Richtung und Rate wie der Griff in Bildmitte');
     const step = angleBetween(basisFromQuat(q0).forward, basisFromQuat(viaGrab).forward);
     const diff = angleBetween(basisFromQuat(viaRate).forward, basisFromQuat(viaGrab).forward);
     const limited = rate < LOOK_RATE / H;
-    check(`d = ${factor} R: Abweichung ≤ 2 % des Schritts${limited ? '' : ' (Rate gedeckelt)'}`,
+    check(`d = ${factor} R: ${limited ? 'Abweichung ≤ 2 % des Schritts' : 'gleiche Richtung (Rate gedeckelt)'}`,
       limited ? diff <= 0.02 * step : dot(basisFromQuat(viaRate).forward, basisFromQuat(viaGrab).forward) > 0,
       `Schritt ${step.toExponential(2)} rad, Abweichung ${diff.toExponential(2)} rad`);
   }
