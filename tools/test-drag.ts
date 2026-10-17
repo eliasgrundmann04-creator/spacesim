@@ -283,7 +283,7 @@ section('6. Wahl beim Aufsetzen');
 
 // — 7. Wurf ————————————————————————————————————————————————————————
 
-section('7. Wurf: gemittelt über 100 ms (Gegenprobe: letzter Schritt / letzter Abstand)');
+section('7. Wurf: Ausgleichsgerade über 100 ms (Gegenprobe: letzter Schritt / letzter Abstand)');
 {
   // Finger mit 2 rad/s, Abtastung alle 8,3 ms, Events aber gebündelt mit Zeitstempel-Jitter
   const rate = 2;
@@ -309,7 +309,7 @@ section('7. Wurf: gemittelt über 100 ms (Gegenprobe: letzter Schritt / letzter 
   }
   const worst = Math.max(...errs);
   const naiveWorst = Math.max(...naiveErrs);
-  check('gemittelte Wurfgeschwindigkeit', worst < 0.1, `max. Fehler ${(worst * 100).toFixed(1)} %`);
+  check('Wurfgeschwindigkeit trotz Zeitstempel-Jitter', worst < 0.1, `max. Fehler ${(worst * 100).toFixed(1)} %`);
   check('Gegenprobe Einzelquotient schwankt', naiveWorst > 0.5, `max. Fehler ${(naiveWorst * 100).toFixed(0)} %`);
 
   const rest = new Fling();
