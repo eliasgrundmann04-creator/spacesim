@@ -8,7 +8,7 @@
 
 | Datei | three | Kern | Deckel | hängt ab von |
 |---|---|---|---|---|
-| `camera/SpaceCamera.ts` | direkt |  | ⚠ | core/constants, math/Vector3d, nav/orientation, nav/vec, universe/CelestialBody |
+| `camera/SpaceCamera.ts` | direkt |  | ⚠ | core/constants, math/Vector3d, nav/dragKernel, nav/fling, nav/orientation, nav/vec, universe/CelestialBody |
 | `core/Engine.ts` | direkt |  | ⚠ | camera/SpaceCamera, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/format, nav/picking, nav/types, nav/vec, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
@@ -17,7 +17,9 @@
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
 | `nav/Navigator.ts` | — | ✓ |  | nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
+| `nav/dragKernel.ts` | — | ✓ |  | nav/orientation, nav/vec |
 | `nav/flightKernel.ts` | — | ✓ |  | nav/proximity, nav/types, nav/vec |
+| `nav/fling.ts` | — | ✓ |  | nav/vec |
 | `nav/format.ts` | — | ✓ |  |  |
 | `nav/gotoKernel.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/orientation.ts` | — | ✓ |  | nav/vec |
@@ -45,10 +47,11 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:throughput`
+- `npm run test` — `npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:throughput`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
 - `npm run test:orientation` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orientation.ts`
+- `npm run test:drag` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-drag.ts`
 - `npm run test:throughput` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts`
 - `npm run contracts` — `node tools/contracts.mjs`
 - `npm run check` — `npm run typecheck && npm test && node tools/contracts.mjs --check && vite build`
@@ -178,12 +181,43 @@
   - `cancelGoto(): void`
   - `update(frame: NavFrame, bodies: readonly BodyRef[], input: NavInput, dt: number): NavResult`
 
+### `nav/dragKernel.ts`
+
+- `interface ScreenPoint { x, y }`
+- `interface DragView { width, height, fovY }`
+- `interface OrbitView { distance, radius }`
+- `type DragKind`
+- `const LOOK_RATE`
+- `const GRAB_EDGE`
+- `const GRAB_MIN_PX`
+- `function chooseDrag(p: ScreenPoint, view: DragView, orbit: OrbitView | null): DragKind`
+- `function dragTurn(kind: DragKind, from: ScreenPoint, to: ScreenPoint, view: DragView, orbit: OrbitView | null): Vec3`
+- `function applyTurn(q: Quat, v: Vec3): Quat`
+- `function turnBetween(a: Vec3, b: Vec3): Vec3`
+- `function grabPoint(p: ScreenPoint, view: DragView, eps: number): Vec3`
+- `function grabAngle(alpha: number, eps: number): number`
+- `function surfaceAngle(alpha: number, eps: number): number`
+
 ### `nav/flightKernel.ts`
 
 - `interface FlightConfig extends ProximityConfig { rate, accelTau, dampTau, maxSpeed, maxReferenceRate, maxStepFraction, maxSubsteps }`
 - `const DEFAULT_FLIGHT: FlightConfig`
 - `interface FlightStep { position, relVelocity, worldVelocity, proximity, speed, relativeSpeed, referenceSpeed, substeps }`
 - `function stepFlight(position: Vec3, relVelocity: Vec3, basis: { forward: Vec3; right: Vec3; up: Vec3 }, input: NavInput, bodies: readonly BodyRef[], frameVelocity: Vec3, dt: number, cfg: FlightConfig = DEFAULT_FLIGHT): FlightStep`
+
+### `nav/fling.ts`
+
+- `const SPIN_TAU`
+- `const MAX_SPIN`
+- `const FLING_WINDOW`
+- `const FLING_REST`
+- `class Fling`
+  - `press(time: number): void`
+  - `record(time: number, v: Vec3): void`
+  - `release(time: number): void`
+  - `stop(): void`
+  - `get angularVelocity(): Vec3`
+  - `coast(dt: number): Vec3 | null`
 
 ### `nav/format.ts`
 

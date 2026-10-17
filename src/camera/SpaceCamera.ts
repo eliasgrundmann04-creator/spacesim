@@ -3,11 +3,12 @@ import { Vector3d } from '../math/Vector3d';
 import { LY } from '../core/constants';
 import type { CelestialBody } from '../universe/CelestialBody';
 import type { Vec3 } from '../nav/vec';
-import { vec3 } from '../nav/vec';
+import { scale, vec3 } from '../nav/vec';
 import type { Quat } from '../nav/orientation';
-import {
-  basisFromQuat, isFiniteQuat, levelRoll, orientTowards, rotateLocal, turnTowards,
-} from '../nav/orientation';
+import { basisFromQuat, isFiniteQuat, orientTowards, turnTowards } from '../nav/orientation';
+import type { DragKind, DragView, OrbitView, ScreenPoint } from '../nav/dragKernel';
+import { applyTurn, chooseDrag, dragTurn } from '../nav/dragKernel';
+import { Fling } from '../nav/fling';
 
 /**
  * Kamera für 20 Größenordnungen.
@@ -36,18 +37,19 @@ import {
  * über den Pol eines Planeten), und die Wirkung einer waagerechten Geste ging dort
  * mit sin φ gegen null, während sich der Azimut weiter aufstaute. Diagonale Gesten
  * liefen dadurch schief. Das Quaternion hat keine ausgezeichnete Achse: eine Geste
- * ist *eine* Drehung um die zur Geste senkrechte Kameraachse. Für den Horizont
- * sorgt stattdessen eine weiche Nivellierung (`levelRoll`), die am Pol und bei
- * gewollter Kopfüberlage von selbst aussetzt.
+ * ist *eine* Drehung um die zur Geste senkrechte Kameraachse.
+ *
+ * **Ab v0.4.4 dreht nichts mehr von selbst.** Die frühere Roll-Nivellierung drehte
+ * das Bild nach jeder schrägen Geste sichtbar um seine Mitte nach. Jede Drehung kommt
+ * jetzt aus einer Geste (`nav/dragKernel.ts`) oder ihrem Nachlauf (`nav/fling.ts`);
+ * im Orbit klebt der berührte Boden am Finger.
  */
 
 const MIN_DISTANCE = 0.5;
 const MAX_DISTANCE = 500 * LY;
 
-/** Zeitkonstante des Drehimpulses (entspricht dem früheren exp(−dt·5)). */
-const SPIN_TAU = 0.2;
-/** Obergrenze der Wurfgeschwindigkeit in rad/s — gegen Ausreißer bei 1-ms-Events. */
-const MAX_SPIN = 12;
+/** Zwei-Finger-Schwenk dreht gedämpft mit. */
+const PAN_GAIN = 0.6;
 
 export type CameraMode = 'orbit' | 'free';
 
@@ -60,7 +62,7 @@ export class SpaceCamera {
   target: CelestialBody | null = null;
   mode: CameraMode = 'orbit';
 
-  /** Weltframe-Norden (Ekliptik J2000, §6) — Bezug der Roll-Nivellierung. */
+  /** Weltframe-Norden (Ekliptik J2000, §6) — Bezug der Startorientierung. */
   private readonly worldUp: Vec3 = vec3(0, 0, 1);
 
   /** Vollständige Orientierung. Einzige Quelle der Wahrheit für die Blickrichtung. */
@@ -69,10 +71,12 @@ export class SpaceCamera {
   private distance = 1e7;
   private targetDistance = 1e7;
 
-  // Drehimpuls in rad/s: lässt Touch-Gesten natürlich auslaufen
-  private spinPitch = 0;
-  private spinYaw = 0;
-  private lastRotateTime = 0;
+  /** Nachlauf nach dem Loslassen — die einzige Drehung ohne Finger auf dem Schirm. */
+  private readonly fling = new Fling();
+  /** Art des laufenden Ein-Finger-Zugs, festgelegt beim Aufsetzen. */
+  private dragKind: DragKind = 'look';
+  /** Canvas-Rechteck, beim Aufsetzen gemessen — je Event erzwänge es ein Layout. */
+  private canvasRect = new DOMRect();
 
   // Freiflug: Höhe über dem Ankerkörper, vom Navigator pro Frame nachgereicht.
   // Sie ersetzt `distance` als Maßstab für Near-Plane und Pinch-Schub.
@@ -111,20 +115,22 @@ export class SpaceCamera {
     dom.addEventListener('pointerdown', (e) => {
       dom.setPointerCapture(e.pointerId);
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      this.stopSpin();
+      this.canvasRect = dom.getBoundingClientRect();
+      this.fling.press(e.timeStamp / 1000);
+      if (this.pointers.size === 1) this.dragKind = this.chooseDragAt(e.clientX, e.clientY);
       if (this.pointers.size === 2) this.beginPinch();
     });
 
     dom.addEventListener('pointermove', (e) => {
       const prev = this.pointers.get(e.pointerId);
       if (!prev) return;
-      const dx = e.clientX - prev.x;
-      const dy = e.clientY - prev.y;
+      const from = { x: prev.x, y: prev.y };
       prev.x = e.clientX;
       prev.y = e.clientY;
 
-      if (this.pointers.size === 1) this.rotateBy(dx, dy, 1);
-      else if (this.pointers.size === 2) this.updatePinch();
+      const time = e.timeStamp / 1000;
+      if (this.pointers.size === 1) this.turn(this.dragKind, from, prev, 1, time);
+      else if (this.pointers.size === 2) this.updatePinch(time);
     });
 
     const release = (e: PointerEvent): void => {
@@ -133,13 +139,17 @@ export class SpaceCamera {
       // Bei 3 → 2 Fingern die Pinch-Basis neu setzen, sonst springt der Zoom
       if (this.pointers.size === 2) this.beginPinch();
       else this.pinchDistance = 0;
+      // 2 → 1: der verbleibende Finger beginnt einen neuen Zug, dort wo er liegt
+      const rest = this.pointers.values().next().value;
+      if (this.pointers.size === 1 && rest) this.dragKind = this.chooseDragAt(rest.x, rest.y);
+      if (this.pointers.size === 0) this.fling.release(e.timeStamp / 1000);
     };
     dom.addEventListener('pointerup', release);
     dom.addEventListener('pointercancel', release);
     window.addEventListener('blur', () => {
       this.pointers.clear();
       this.pinchDistance = 0;
-      this.stopSpin();
+      this.fling.stop();
     });
 
     dom.addEventListener(
@@ -159,28 +169,38 @@ export class SpaceCamera {
   }
 
   /**
-   * Zieh-Geste → *eine* Drehung um die zur Geste senkrechte Kameraachse.
-   * Sensitivität relativ zur kürzeren Bildschirmkante ⇒ auf Tablet und Desktop gleich.
-   * Weil beide Komponenten in denselben Rotationsvektor gehen, folgt der Blick der
-   * Diagonalen exakt — unabhängig davon, wohin die Kamera gerade zeigt.
+   * Zugschritt anwenden (Client-Koordinaten). Die Drehung rechnet der Kern aus;
+   * hier wird sie nur angehängt und für den Nachlauf gemerkt.
    */
-  private rotateBy(dx: number, dy: number, scale: number): void {
-    const k = (2.2 / Math.min(window.innerWidth, window.innerHeight)) * scale;
-    const pitch = dy * k;  // nach unten ziehen ⇒ Blick hebt sich
-    const yaw = dx * k;    // nach rechts ziehen ⇒ Blick schwenkt nach links
-    if (pitch === 0 && yaw === 0) return;
+  private turn(kind: DragKind, from: ScreenPoint, to: ScreenPoint, gain: number, time: number): void {
+    const s = this.screen();
+    const v = dragTurn(kind, s.local(from), s.local(to), s.view, this.orbitView());
+    const step = scale(v, gain);
+    this.orientation = applyTurn(this.orientation, step);
+    this.updateViewVector();
+    this.fling.record(time, step);
+  }
 
-    this.orientation = rotateLocal(this.orientation, pitch, yaw);
+  private chooseDragAt(x: number, y: number): DragKind {
+    const s = this.screen();
+    return chooseDrag(s.local({ x, y }), s.view, this.orbitView());
+  }
 
-    // Wurfgeschwindigkeit aus dem Event-Abstand — framerate-unabhängig, im
-    // Gegensatz zum früheren "letztes Delta = Impuls".
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const gap = this.lastRotateTime > 0 ? (now - this.lastRotateTime) / 1000 : 0;
-    this.lastRotateTime = now;
-    if (gap > 0.001 && gap < 0.12) {
-      this.spinPitch = clampAbs(pitch / gap, MAX_SPIN);
-      this.spinYaw = clampAbs(yaw / gap, MAX_SPIN);
-    }
+  /** Canvas-Geometrie für den Gestenkern; `local` rechnet Client- in Canvas-Koordinaten um. */
+  private screen(): { view: DragView; local: (p: ScreenPoint) => ScreenPoint } {
+    const r = this.canvasRect;
+    return {
+      view: { width: r.width, height: r.height, fovY: this.fovYRadians },
+      local: (p) => ({ x: p.x - r.left, y: p.y - r.top }),
+    };
+  }
+
+  /** Orbit-Geometrie für den Griff (Radius bis zum Boden unter der Kamera), im Freiflug null. */
+  private orbitView(): OrbitView | null {
+    const t = this.target;
+    if (this.mode !== 'orbit' || !t) return null;
+    this.radial.copy(this.view).multiplyScalar(-1);
+    return { distance: this.distance, radius: t.radius + t.getSurfaceOffset(this.radial) };
   }
 
   /**
@@ -210,7 +230,7 @@ export class SpaceCamera {
     this.pinchY = (a.y + b.y) / 2;
   }
 
-  private updatePinch(): void {
+  private updatePinch(time: number): void {
     const [a, b] = this.twoPointers();
     const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
     const midX = (a.x + b.x) / 2;
@@ -219,8 +239,9 @@ export class SpaceCamera {
     if (this.pinchDistance > 0) {
       // Auseinanderziehen (dist wächst) ⇒ heranzoomen ⇒ Distanz sinkt
       this.zoomBy(this.pinchDistance / dist);
-      // Zwei-Finger-Schwenk rotiert zusätzlich, gedämpft
-      this.rotateBy(midX - this.pinchX, midY - this.pinchY, 0.6);
+      // Zwei-Finger-Schwenk dreht mit, nie als Griff: zwei Finger halten keinen Punkt fest
+      const kind = this.mode === 'orbit' ? 'orbit' : 'look';
+      this.turn(kind, { x: this.pinchX, y: this.pinchY }, { x: midX, y: midY }, PAN_GAIN, time);
     }
 
     this.pinchDistance = dist;
@@ -236,7 +257,7 @@ export class SpaceCamera {
     this.mode = 'orbit';
     this.targetDistance = body.radius * 6;
     this.distance = this.targetDistance;
-    this.stopSpin();
+    this.fling.stop();
   }
 
   /**
@@ -248,7 +269,7 @@ export class SpaceCamera {
     this.target = body;
     this.mode = 'orbit';
     this.pendingDolly = 1;
-    this.stopSpin();
+    this.fling.stop();
 
     const dx = this.worldPosition.x - body.position.x;
     const dy = this.worldPosition.y - body.position.y;
@@ -257,9 +278,10 @@ export class SpaceCamera {
     if (d > 0 && Number.isFinite(d)) {
       this.distance = THREE.MathUtils.clamp(d, MIN_DISTANCE, MAX_DISTANCE);
       this.targetDistance = this.distance;
-      // Blickrichtung zeigt zum Körper, also entgegen dem Radialvektor. Kein Klemmen
-      // mehr: ein Anflug genau über den Pol endet exakt dort, wo er ankam.
-      this.setViewDirection(-dx / d, -dy / d, -dz / d);
+      // Blick exakt aufs Zentrum, über die kürzeste Drehung: der Roll bleibt, wie er ist.
+      // Ein Zurücksetzen auf den Weltnorden wäre ein sichtbarer Ruck um die Bildmitte.
+      this.orientation = turnTowards(this.orientation, vec3(-dx / d, -dy / d, -dz / d), 1);
+      this.updateViewVector();
     } else {
       this.distance = this.targetDistance = body.radius * 6;
     }
@@ -270,19 +292,6 @@ export class SpaceCamera {
     if (this.mode === 'free') return;
     this.mode = 'free';
     this.pendingDolly = 1;
-  }
-
-  private stopSpin(): void {
-    this.spinPitch = 0;
-    this.spinYaw = 0;
-    this.lastRotateTime = 0;
-  }
-
-  /** Harter Setzpunkt der Blickrichtung, Roll auf den Weltnorden ausgerichtet. */
-  private setViewDirection(x: number, y: number, z: number): void {
-    const previousRight = basisFromQuat(this.orientation).right;
-    this.orientation = orientTowards(vec3(x, y, z), this.worldUp, previousRight);
-    this.updateViewVector();
   }
 
   /**
@@ -301,7 +310,7 @@ export class SpaceCamera {
     const s = 1 - Math.exp(-dt / tau);
     this.orientation = turnTowards(this.orientation, vec3(dx / d, dy / d, dz / d), s);
     this.updateViewVector();
-    this.stopSpin();
+    this.fling.stop();
   }
 
   /** Für Bildschirm-Buttons auf Geräten ohne Tastatur/Mausrad. */
@@ -362,24 +371,17 @@ export class SpaceCamera {
    * der Blickrichtung dieses Frames rechnet und nicht mit der des letzten.
    */
   updateOrientation(dt: number): void {
-    if (this.pointers.size === 0 && (this.spinPitch !== 0 || this.spinYaw !== 0)) {
-      this.orientation = rotateLocal(this.orientation, this.spinPitch * dt, this.spinYaw * dt);
-      const decay = Math.exp(-dt / SPIN_TAU);
-      this.spinPitch *= decay;
-      this.spinYaw *= decay;
-      if (Math.abs(this.spinPitch) < 1e-4 && Math.abs(this.spinYaw) < 1e-4) this.stopSpin();
-    }
-
-    // Horizont sanft nachziehen. Ersetzt den alten phi-Klemmbereich: keine Achse
-    // wird blockiert, der Roll driftet aber auch nicht weg.
-    this.orientation = levelRoll(this.orientation, this.worldUp, dt);
+    // Einzige Drehung ohne Finger: der Nachlauf. Keine Nivellierung — sie drehte das
+    // Bild nach schrägen Gesten ungefragt um seine Mitte.
+    const coast = this.fling.coast(dt);
+    if (coast) this.orientation = applyTurn(this.orientation, coast);
 
     // Letzte Verteidigungslinie: eine entartete Orientierung würde über die
     // Kameramatrix die ganze Szene verschlucken (Muster §8: stiller Fallback).
     if (!isFiniteQuat(this.orientation)) {
       console.warn('[SpaceCamera] Orientierung entartet — auf Weltnorden zurückgesetzt.');
       this.orientation = orientTowards(vec3(1, 0, 0), this.worldUp);
-      this.stopSpin();
+      this.fling.stop();
     }
 
     this.updateViewVector();
@@ -468,9 +470,4 @@ export class SpaceCamera {
   get fovYRadians(): number {
     return (this.camera.fov * Math.PI) / 180;
   }
-}
-
-function clampAbs(v: number, max: number): number {
-  if (!Number.isFinite(v)) return 0;
-  return v > max ? max : v < -max ? -max : v;
 }
