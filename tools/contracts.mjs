@@ -33,7 +33,7 @@ const LINE_CAP = 300;
 /** Bestand über dem Deckel bei Einführung (v0.4.1). Wert = Obergrenze, nicht Ziel. */
 const CAP_BASELINE = {
   'src/core/Engine.ts': 496,
-  'src/camera/SpaceCamera.ts': 476,
+  'src/camera/SpaceCamera.ts': 448,
   'src/terrain/TerrainProvider.ts': 442,
   'src/terrain/gpuTerrain.ts': 361,
   'src/terrain/tileGeometry.ts': 307,

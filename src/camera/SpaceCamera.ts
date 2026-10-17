@@ -5,9 +5,10 @@ import type { CelestialBody } from '../universe/CelestialBody';
 import type { Vec3 } from '../nav/vec';
 import { vec3 } from '../nav/vec';
 import type { Quat } from '../nav/orientation';
-import {
-  basisFromQuat, isFiniteQuat, levelRoll, orientTowards, rotateLocal, turnTowards,
-} from '../nav/orientation';
+import { basisFromQuat, isFiniteQuat, levelRoll, orientTowards, turnTowards } from '../nav/orientation';
+import { LOOK_RATE, dragLook, hitSphere, localTurn, orbitGrab, orbitRate } from '../nav/dragKernel';
+import { screenRay } from '../nav/picking';
+import { GestureInput } from './gestures';
 
 /**
  * Kamera für 20 Größenordnungen.
@@ -38,7 +39,8 @@ import {
  * liefen dadurch schief. Das Quaternion hat keine ausgezeichnete Achse: eine Geste
  * ist *eine* Drehung um die zur Geste senkrechte Kameraachse. Für den Horizont
  * sorgt stattdessen eine weiche Nivellierung (`levelRoll`), die am Pol und bei
- * gewollter Kopfüberlage von selbst aussetzt.
+ * gewollter Kopfüberlage von selbst aussetzt. Gesten halten den Roll fest, im Orbit
+ * klebt der berührte Boden am Finger (`nav/dragKernel.ts`).
  */
 
 const MIN_DISTANCE = 0.5;
@@ -48,10 +50,10 @@ const MAX_DISTANCE = 500 * LY;
 const SPIN_TAU = 0.2;
 /** Obergrenze der Wurfgeschwindigkeit in rad/s — gegen Ausreißer bei 1-ms-Events. */
 const MAX_SPIN = 12;
+/** Bis zu dieser Distanz (in Radien) greift der Finger den Boden; darüber dreht er mit fester Rate. */
+const GRAB_RANGE = 10;
 
 export type CameraMode = 'orbit' | 'free';
-
-interface PointerState { x: number; y: number; }
 
 export class SpaceCamera {
   readonly camera: THREE.PerspectiveCamera;
@@ -79,10 +81,10 @@ export class SpaceCamera {
   private freeAltitude = 1e6;
   private pendingDolly = 1;
 
-  private readonly pointers = new Map<number, PointerState>();
-  private pinchDistance = 0;
-  private pinchX = 0;
-  private pinchY = 0;
+  private readonly gestures: GestureInput;
+  /** Orbit: berührter Bodenpunkt als Richtung vom Zentrum (Welt), auf Kugelradius grabRadius. */
+  private grab: Vec3 | null = null;
+  private grabRadius = 1;
 
   private readonly view = new THREE.Vector3();   // Blickrichtung (f32-Spiegel)
   private readonly radial = new THREE.Vector3(); // Zentrum → Kamera
@@ -99,81 +101,81 @@ export class SpaceCamera {
     // sobald die Blickachse parallel zu +Z steht.
     this.camera.up.set(0, 0, 1);
 
-    dom.style.touchAction = 'none';
-    this.bindPointer();
+    this.gestures = this.bindGestures();
   }
 
   // -------------------------------------------------------------- Eingabe
 
-  private bindPointer(): void {
-    const dom = this.dom;
-
-    dom.addEventListener('pointerdown', (e) => {
-      dom.setPointerCapture(e.pointerId);
-      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      this.stopSpin();
-      if (this.pointers.size === 2) this.beginPinch();
-    });
-
-    dom.addEventListener('pointermove', (e) => {
-      const prev = this.pointers.get(e.pointerId);
-      if (!prev) return;
-      const dx = e.clientX - prev.x;
-      const dy = e.clientY - prev.y;
-      prev.x = e.clientX;
-      prev.y = e.clientY;
-
-      if (this.pointers.size === 1) this.rotateBy(dx, dy, 1);
-      else if (this.pointers.size === 2) this.updatePinch();
-    });
-
-    const release = (e: PointerEvent): void => {
-      if (!this.pointers.delete(e.pointerId)) return;
-      if (dom.hasPointerCapture(e.pointerId)) dom.releasePointerCapture(e.pointerId);
-      // Bei 3 → 2 Fingern die Pinch-Basis neu setzen, sonst springt der Zoom
-      if (this.pointers.size === 2) this.beginPinch();
-      else this.pinchDistance = 0;
-    };
-    dom.addEventListener('pointerup', release);
-    dom.addEventListener('pointercancel', release);
-    window.addEventListener('blur', () => {
-      this.pointers.clear();
-      this.pinchDistance = 0;
-      this.stopSpin();
-    });
-
-    dom.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        this.zoomBy(Math.exp(e.deltaY * 0.0015));
+  private bindGestures(): GestureInput {
+    return new GestureInput(this.dom, {
+      press: (x, y, count) => {
+        this.stopSpin();
+        this.grab = count === 1 ? this.grabAt(x, y) : null;
       },
-      { passive: false },
-    );
+      drag: (x, y, dx, dy) => this.drag(x, y, dx, dy),
+      pinch: (factor, dx, dy) => {
+        this.zoomBy(factor);
+        this.rotateBy(dx, dy, 0.6); // Zwei-Finger-Schwenk rotiert zusätzlich, gedämpft
+      },
+      release: () => {
+        this.grab = null; // nach 2 → 1 Finger greift der verbleibende beim nächsten Zug neu
+      },
+      wheel: (factor) => this.zoomBy(factor),
+      blur: () => this.stopSpin(),
+    });
+  }
 
-    // iOS-Safari: Seiten-Zoom per Pinch unterbinden, damit die Geste bei uns ankommt
-    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
-      dom.addEventListener(type, (e: Event) => e.preventDefault());
-    }
-    dom.addEventListener('contextmenu', (e) => e.preventDefault());
+  /** Ein Finger: im Orbit klebt der berührte Boden am Finger, sonst feste Drehrate. */
+  private drag(x: number, y: number, dx: number, dy: number): void {
+    const next = this.grab && this.mode === 'orbit'
+      ? orbitGrab(this.orientation, this.distance, this.grabRadius, this.rayAt(x, y), this.grab, this.worldUp)
+      : null;
+    if (next) return this.applyTurn(next);
+    this.rotateBy(dx, dy, 1);
+    this.grab = this.grabAt(x, y); // Finger wieder auf dem Körper ⇒ neu greifen
+  }
+
+  /** Bodenpunkt unter dem Finger (Orbit, nah genug), sonst null. */
+  private grabAt(x: number, y: number): Vec3 | null {
+    const t = this.target;
+    if (this.mode !== 'orbit' || !t || this.distance > GRAB_RANGE * t.radius) return null;
+    this.grabRadius = this.groundRadius(t);
+    const f = this.basis().forward;
+    const origin = { x: -f.x * this.distance, y: -f.y * this.distance, z: -f.z * this.distance };
+    return hitSphere(origin, this.rayAt(x, y), this.grabRadius);
+  }
+
+  private rayAt(x: number, y: number): Vec3 {
+    const r = this.dom.getBoundingClientRect();
+    return screenRay(x - r.left, y - r.top, r.width, r.height, this.fovYRadians, this.basis());
+  }
+
+  /** Radius bis zum Boden unter der Kamera — mit Terrain, sonst stimmt die Rate am Berg nicht. */
+  private groundRadius(t: CelestialBody): number {
+    this.updateViewVector();
+    this.radial.copy(this.view).multiplyScalar(-1);
+    return t.radius + t.getSurfaceOffset(this.radial);
   }
 
   /**
-   * Zieh-Geste → *eine* Drehung um die zur Geste senkrechte Kameraachse.
-   * Sensitivität relativ zur kürzeren Bildschirmkante ⇒ auf Tablet und Desktop gleich.
-   * Weil beide Komponenten in denselben Rotationsvektor gehen, folgt der Blick der
-   * Diagonalen exakt — unabhängig davon, wohin die Kamera gerade zeigt.
+   * Drehung mit fester Rate, Roll gehalten. Freiflug: der Blick folgt dem Finger
+   * (nach unten ziehen ⇒ Blick hebt sich). Orbit: der Körper folgt dem Finger —
+   * umgekehrtes Vorzeichen, Rate wie der Boden in Bildmitte.
    */
   private rotateBy(dx: number, dy: number, scale: number): void {
-    const k = (2.2 / Math.min(window.innerWidth, window.innerHeight)) * scale;
-    const pitch = dy * k;  // nach unten ziehen ⇒ Blick hebt sich
-    const yaw = dx * k;    // nach rechts ziehen ⇒ Blick schwenkt nach links
-    if (pitch === 0 && yaw === 0) return;
+    const minEdge = Math.min(window.innerWidth, window.innerHeight);
+    const t = this.mode === 'orbit' ? this.target : null;
+    const k = t
+      ? -orbitRate(this.distance, this.groundRadius(t), this.fovYRadians, window.innerHeight, minEdge) * scale
+      : (LOOK_RATE / minEdge) * scale;
+    if (dx === 0 && dy === 0) return;
+    this.applyTurn(dragLook(this.orientation, dy * k, dx * k, this.worldUp));
+  }
 
-    this.orientation = rotateLocal(this.orientation, pitch, yaw);
-
-    // Wurfgeschwindigkeit aus dem Event-Abstand — framerate-unabhängig, im
-    // Gegensatz zum früheren "letztes Delta = Impuls".
+  /** Neue Orientierung übernehmen; Wurfgeschwindigkeit aus dem Event-Abstand (framerate-unabhängig). */
+  private applyTurn(next: Quat): void {
+    const { pitch, yaw } = localTurn(this.orientation, next);
+    this.orientation = next;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const gap = this.lastRotateTime > 0 ? (now - this.lastRotateTime) / 1000 : 0;
     this.lastRotateTime = now;
@@ -196,36 +198,6 @@ export class SpaceCamera {
     } else {
       this.pendingDolly *= factor;
     }
-  }
-
-  private twoPointers(): [PointerState, PointerState] {
-    const it = this.pointers.values();
-    return [it.next().value as PointerState, it.next().value as PointerState];
-  }
-
-  private beginPinch(): void {
-    const [a, b] = this.twoPointers();
-    this.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-    this.pinchX = (a.x + b.x) / 2;
-    this.pinchY = (a.y + b.y) / 2;
-  }
-
-  private updatePinch(): void {
-    const [a, b] = this.twoPointers();
-    const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
-    const midX = (a.x + b.x) / 2;
-    const midY = (a.y + b.y) / 2;
-
-    if (this.pinchDistance > 0) {
-      // Auseinanderziehen (dist wächst) ⇒ heranzoomen ⇒ Distanz sinkt
-      this.zoomBy(this.pinchDistance / dist);
-      // Zwei-Finger-Schwenk rotiert zusätzlich, gedämpft
-      this.rotateBy(midX - this.pinchX, midY - this.pinchY, 0.6);
-    }
-
-    this.pinchDistance = dist;
-    this.pinchX = midX;
-    this.pinchY = midY;
   }
 
   // ------------------------------------------------------------ Steuerung
@@ -362,8 +334,8 @@ export class SpaceCamera {
    * der Blickrichtung dieses Frames rechnet und nicht mit der des letzten.
    */
   updateOrientation(dt: number): void {
-    if (this.pointers.size === 0 && (this.spinPitch !== 0 || this.spinYaw !== 0)) {
-      this.orientation = rotateLocal(this.orientation, this.spinPitch * dt, this.spinYaw * dt);
+    if (this.gestures.active === 0 && (this.spinPitch !== 0 || this.spinYaw !== 0)) {
+      this.orientation = dragLook(this.orientation, this.spinPitch * dt, this.spinYaw * dt, this.worldUp);
       const decay = Math.exp(-dt / SPIN_TAU);
       this.spinPitch *= decay;
       this.spinYaw *= decay;

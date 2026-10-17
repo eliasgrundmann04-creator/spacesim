@@ -8,7 +8,8 @@
 
 | Datei | three | Kern | Deckel | hängt ab von |
 |---|---|---|---|---|
-| `camera/SpaceCamera.ts` | direkt |  | ⚠ | core/constants, math/Vector3d, nav/orientation, nav/vec, universe/CelestialBody |
+| `camera/SpaceCamera.ts` | direkt |  | ⚠ | camera/gestures, core/constants, math/Vector3d, nav/dragKernel, nav/orientation, nav/picking, nav/vec, universe/CelestialBody |
+| `camera/gestures.ts` | — |  |  |  |
 | `core/Engine.ts` | direkt |  | ⚠ | camera/SpaceCamera, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/format, nav/picking, nav/types, nav/vec, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
@@ -17,6 +18,7 @@
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
 | `nav/Navigator.ts` | — | ✓ |  | nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
+| `nav/dragKernel.ts` | — | ✓ |  | nav/orientation, nav/vec |
 | `nav/flightKernel.ts` | — | ✓ |  | nav/proximity, nav/types, nav/vec |
 | `nav/format.ts` | — | ✓ |  |  |
 | `nav/gotoKernel.ts` | — | ✓ |  | nav/types, nav/vec |
@@ -45,10 +47,11 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:throughput`
+- `npm run test` — `npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:throughput`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
 - `npm run test:orientation` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orientation.ts`
+- `npm run test:drag` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-drag.ts`
 - `npm run test:throughput` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts`
 - `npm run contracts` — `node tools/contracts.mjs`
 - `npm run check` — `npm run typecheck && npm test && node tools/contracts.mjs --check && vite build`
@@ -78,6 +81,13 @@
   - `get altitude(): number`
   - `resize(width: number, height: number): void`
   - `get fovYRadians(): number`
+
+### `camera/gestures.ts`
+
+- `interface GestureHandlers { press, drag, pinch, release, wheel, blur }`
+- `class GestureInput`
+  - `constructor(dom: HTMLElement, h: GestureHandlers)`
+  - `get active(): number`
 
 ### `core/Engine.ts`
 
@@ -177,6 +187,17 @@
   - `requestGoto(cameraPos: Vec3, target: BodyRef, preferredDir?: Vec3): void`
   - `cancelGoto(): void`
   - `update(frame: NavFrame, bodies: readonly BodyRef[], input: NavInput, dt: number): NavResult`
+
+### `nav/dragKernel.ts`
+
+- `const LOOK_RATE`
+- `function arcBetween(a: Vec3, b: Vec3): Quat`
+- `function hitSphere(origin: Vec3, dir: Vec3, radius: number): Vec3 | null`
+- `function holdRoll(before: Quat, after: Quat, worldUp: Vec3, cfg: LevelConfig = DEFAULT_LEVEL): Quat`
+- `function dragLook(q: Quat, pitch: number, yaw: number, worldUp: Vec3, cfg: LevelConfig = DEFAULT_LEVEL): Quat`
+- `function orbitGrab(q: Quat, distance: number, radius: number, ray: Vec3, grab: Vec3, worldUp: Vec3, cfg: LevelConfig = DEFAULT_LEVEL): Quat | null`
+- `function localTurn(from: Quat, to: Quat): { pitch: number; yaw: number }`
+- `function orbitRate(distance: number, radius: number, fovY: number, heightPx: number, minEdgePx: number): number`
 
 ### `nav/flightKernel.ts`
 

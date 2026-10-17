@@ -24,9 +24,9 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.3)
+## 2. Aktueller Stand (v0.4.4)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 97 Offline-Tests (41 Navigation, 10 Kepler, 19 Orientierung, 27 Durchsatz), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 127 Offline-Tests (41 Navigation, 10 Kepler, 19 Orientierung, 30 Gesten, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
@@ -36,7 +36,7 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Cube-Sphere-LOD-Quadtree bis Level 14 (~50 m Vertexabstand), asynchron über Worker-Pool; optionaler WGSL-Compute-Pfad via TSL (`?terrain=gpu`) mit Selbsttest und Fallback
 - Kachel-Pipeline mit Wachhund: unbeantwortete Worker-Jobs werden erkannt und einmal neu gestellt, nach sechs Verlusten dauerhafter Wechsel auf den synchronen Pfad; Prioritäten werden jedes Frame nachgeführt
 - **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kern liegt isoliert und three-frei in `src/nav/`
-- Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag, weiche Roll-Nivellierung), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Rotation mit Drehimpuls in rad/s, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung
+- Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag, weiche Roll-Nivellierung), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Rotation mit Drehimpuls in rad/s, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Gesten halten den Roll (kein Kippen des Horizonts bei schrägen Gesten); im Orbit klebt der berührte Boden am Finger (Globus-Steuerung, `nav/dragKernel.ts`)
 - Adaptive Renderauflösung (0,7×–2×)
 - Laufzeit-Selbsttest in `Engine`: warnt, wenn die Kamera ohne Schub von ihrem Anker wegdriftet — diagnostiziert Verwechslungen von `dtReal` und `dtSim`
 - Agent-Betrieb: `AGENTS.md`, CI auf jedem PR, Vertragskarte mit Invarianten-Prüfung, Aufgabenwarteschlange in `docs/aufgaben/` (§8, §12)
@@ -307,6 +307,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.1 | Umzug auf Agent-Betrieb: Quellbaum statt ZIP im Repo, `AGENTS.md`, CI, Netlify-Vorschau, `tools/contracts.mjs` + `docs/contracts.md` (three-Freiheit transitiv, Dateideckel-Ratsche), Aufgaben 00–06. Testskripte mit `--experimental-strip-types` (sonst scheitern sie unter Node 22.6–22.17), drei verdeckte Typfehler behoben (`npm run build` lief vorher nicht), Präzisionstabelle §3.1 korrigiert, §8/§12 auf Aufgaben und PRs umgestellt |
 | v0.4.2 | Probelauf: doppeltes `formatDistance` auf `src/nav/format.ts` konsolidiert, veraltete Definition aus `src/core/constants.ts` entfernt. |
 | v0.4.3 | `SPICKZETTEL.md` für den Inhaber; `AGENTS.md`: PR-Beschreibung vollständig nach Vorlage inklusive Testausgabe und `Fixes #…`; Vorlage um *Testausgabe* ergänzt; Aufgabe 04 an die Versionsregel angeglichen |
+| v0.4.4 | Aufgabe 07: Touch-Gesten. Orbit: der berührte Bodenpunkt bleibt unter dem Finger (vorher lief der Körper dem Finger entgegen); Gesten und Nachlauf halten den Roll (vorher kippte eine schräge Geste den Horizont, die Nivellierung drehte sichtbar nach). Neuer three-freier Kern `src/nav/dragKernel.ts` mit 30 Offline-Tests; Multi-Pointer-Erkennung nach `src/camera/gestures.ts` ausgelagert, `SpaceCamera.ts` 476 → 448 Zeilen |
 
 ---
 
