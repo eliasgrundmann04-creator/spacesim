@@ -1,7 +1,7 @@
 ---
 id: 09
 titel: Kamera-Gefühl — längerer Nachlauf, späteres Drehen, gleichmäßiger Orbit, Werte per URL
-status: offen
+status: erledigt
 braucht: [08]
 stufe: —
 tablet: ja
