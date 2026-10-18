@@ -1,7 +1,7 @@
 ---
 id: 01
 titel: Stufe 2a — Frame-Baum als reine Datenstruktur
-status: offen
+status: erledigt
 braucht: [00]
 stufe: 2a
 tablet: nein

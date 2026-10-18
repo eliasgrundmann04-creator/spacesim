@@ -22,6 +22,7 @@ const OUT = 'docs/contracts.md';
 
 /** Rechenkerne, die in Worker, Main-Thread und Node identisch laufen müssen (§5). */
 const THREE_FREE = [
+  'src/frames/',
   'src/nav/',
   'src/terrain/tileGeometry.ts',
   'src/terrain/noise.ts',

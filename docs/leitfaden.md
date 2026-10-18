@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.3 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.5 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,9 +24,9 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.4)
+## 2. Aktueller Stand (v0.4.5)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 135 Offline-Tests (41 Navigation, 10 Kepler, 19 Orientierung, 38 Gesten, 27 Durchsatz), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 142 Offline-Tests (7 Frame-Baum, 41 Navigation, 10 Kepler, 19 Orientierung, 38 Gesten, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
@@ -263,6 +263,7 @@ Neue Rechenkerne so schneiden, dass sie in Node testbar sind — das ist der Gru
 Zu entscheiden, wenn die jeweilige Stufe ansteht:
 
 - **Frame-Wechsel-Schwellen** (Stufe 2): distanzbasiert, hierarchisch nach SOI, oder nach Winkelgröße? → Entscheidungsvorlage ist Aufgabe 04.
+- **Meter-Einheit je Frame** (Befund aus Stufe 2a / Aufgabe 01): IEEE-754 f64 ist Gleitkomma — die relative Auflösung hängt ausschließlich am Betrag der Koordinate, nicht an ihrer physikalischen Einheit. Ein Skalenfaktor pro Frame bringt zusätzliche Rundungsfehler, aber keine rechnerische Präzision. Alle Frames bleiben daher bei Metern (`m`).
 - **Katalogformat** (Stufe 4): JSON ist bei 10⁵ Sternen zu groß. Binärformat mit gepackten Feldern, gestreamt in Chunks?
 - **Nebeldaten** (Stufe 5): echte 3D-Daten existieren nicht — Rekonstruktion aus 2D-Bild plus geschätzter Distanz. Wie viel Handarbeit pro Objekt ist vertretbar?
 - **Speicherbudget** auf dem Tablet: ab wann werden ferne Systeme wieder entladen?
@@ -309,6 +310,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.2 | Probelauf: doppeltes `formatDistance` auf `src/nav/format.ts` konsolidiert, veraltete Definition aus `src/core/constants.ts` entfernt. |
 | v0.4.3 | `SPICKZETTEL.md` für den Inhaber; `AGENTS.md`: PR-Beschreibung vollständig nach Vorlage inklusive Testausgabe und `Fixes #…`; Vorlage um *Testausgabe* ergänzt; Aufgabe 04 an die Versionsregel angeglichen |
 | v0.4.4 | Aufgabe 07: Touch-Gesten. Orbit: der berührte Bodenpunkt bleibt unter dem Finger (vorher lief der Körper dem Finger entgegen), zum Planetenrand stetig gesättigt statt unbegrenzt. Roll-Nivellierung entfernt — sie drehte das Bild nach schrägen Gesten ungefragt um seine Mitte. Wurf als Ausgleichsgerade über 100 ms, kein Wurf nach Ruhen, Nachlauf framerate-unabhängig integriert. Neue three-freie Kerne `nav/dragKernel.ts` und `nav/fling.ts` mit 38 Offline-Tests; `SpaceCamera.ts` 476 → 473 Zeilen |
+| v0.4.5 | Stufe 2a (Aufgabe 01): Frame-Baum als reine, three-freie Datenstruktur (`src/frames/`). `createFrame`, `attachFrame`, `findLCA`, `transformPoint` mit präziser LCA-Ablösung. 7 Offline-Tests in `tools/test-frames.ts` inklusive Nah-bei-Nah-, Fern-, Roundtrip- (≤ 4 · ε · max|p|), Gegenprobe- und Bewegungs-Tests. |
 
 ---
 
