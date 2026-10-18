@@ -1,7 +1,7 @@
 {
   "name": "space-sim",
   "private": true,
-  "version": "0.4.4",
+  "version": "0.4.6",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.5 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.6 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,7 +24,7 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.5)
+## 2. Aktueller Stand (v0.4.6)
 
 Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 142 Offline-Tests (7 Frame-Baum, 41 Navigation, 10 Kepler, 19 Orientierung, 38 Gesten, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
@@ -36,7 +36,7 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Cube-Sphere-LOD-Quadtree bis Level 14 (~50 m Vertexabstand), asynchron über Worker-Pool; optionaler WGSL-Compute-Pfad via TSL (`?terrain=gpu`) mit Selbsttest und Fallback
 - Kachel-Pipeline mit Wachhund: unbeantwortete Worker-Jobs werden erkannt und einmal neu gestellt, nach sechs Verlusten dauerhafter Wechsel auf den synchronen Pfad; Prioritäten werden jedes Frame nachgeführt
 - **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kern liegt isoliert und three-frei in `src/nav/`
-- Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, im Freiflug dreht das Bild nie um seine Mitte
+- Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, im Freiflug dreht das Bild nie um seine Mitte. Seit v0.4.6 ist `SpaceCamera.ts` unter den Dateideckel geteilt (`cameraTouch.ts` three-frei, `cameraPlacement.ts`)
 - Adaptive Renderauflösung (0,7×–2×)
 - Laufzeit-Selbsttest in `Engine`: warnt, wenn die Kamera ohne Schub von ihrem Anker wegdriftet — diagnostiziert Verwechslungen von `dtReal` und `dtSim`
 - Agent-Betrieb: `AGENTS.md`, CI auf jedem PR, Vertragskarte mit Invarianten-Prüfung, Aufgabenwarteschlange in `docs/aufgaben/` (§8, §12)
@@ -89,7 +89,7 @@ Der schwierige Teil ist nie die einzelne Darstellung, sondern dass **Helligkeit,
 
 ### 3.3 Physikalische Photometrie + HDR
 
-Der „Hubble-Look" entsteht nicht durch mehr Geometrie, sondern durch korrekte Leuchtdichten: Magnitude → Irradianz am Auge, Auto-Belichtung mit Adaption, Glare/Bloom als Kamera-Effekt, Tonemapping am Ende. Ohne diese Kette ist ein Feld aus 10⁵ Sternen nur Rauschen und ein Nebel nur grauer Matsch — unabhängig davon, wie gut der Renderer ist.
+Der „Hubble-Look" entsteht nicht durch mehr Geometrie, sondern durch korrekte Leuchtdichten: Magnitude → Irradianz am Auge, Auto-Belichtung mit Adaptionszeit, Glare/Bloom als Kamera-Effekt, Tonemapping am Ende. Ohne diese Kette ist ein Feld aus 10⁵ Sternen nur Rauschen und ein Nebel nur grauer Matsch — unabhängig davon, wie gut der Renderer ist.
 
 ---
 
@@ -224,7 +224,7 @@ Galaxien mit Impostor → Partikelwolke → Einzelsterne. Filamente und Voids au
 
 ### 8.1 Kontextbudget
 
-Die begrenzende Größe dieses Projekts ist nicht der Umfang des Codes, sondern die Zahl der Dateien, die man lesen muss, um eine Änderung korrekt zu machen. Sie wird wie eine Performance-Kennzahl behandelt — für Agenten genauso wie für Menschen.
+Die begrenzende Größe dieses Projekts ist nicht der Umfang des Codes, sondern die Zahl der Dateien, die man liest, um eine Änderung korrekt zu machen. Sie wird wie eine Performance-Kennzahl behandelt — für Agenten genauso wie für Menschen.
 
 - **Dateideckel ~300 Zeilen** in `src/`. `npm run check` lässt neue Dateien darüber und jedes Wachstum der Bestandsdateien in `CAP_BASELINE` scheitern. Eine Überschreitung ist ein Auftrag zum Teilen, kein Schönheitsfehler.
 - **Einstiegspunkt ist `docs/contracts.md`**, nicht der Quelltext. Wer eine Änderung plant, liest die Vertragskarte plus die Dateien, die er tatsächlich anfasst.
@@ -311,6 +311,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.3 | `SPICKZETTEL.md` für den Inhaber; `AGENTS.md`: PR-Beschreibung vollständig nach Vorlage inklusive Testausgabe und `Fixes #…`; Vorlage um *Testausgabe* ergänzt; Aufgabe 04 an die Versionsregel angeglichen |
 | v0.4.4 | Aufgabe 07: Touch-Gesten. Orbit: der berührte Bodenpunkt bleibt unter dem Finger (vorher lief der Körper dem Finger entgegen), zum Planetenrand stetig gesättigt statt unbegrenzt. Roll-Nivellierung entfernt — sie drehte das Bild nach schrägen Gesten ungefragt um seine Mitte. Wurf als Ausgleichsgerade über 100 ms, kein Wurf nach Ruhen, Nachlauf framerate-unabhängig integriert. Neue three-freie Kerne `nav/dragKernel.ts` und `nav/fling.ts` mit 38 Offline-Tests; `SpaceCamera.ts` 476 → 473 Zeilen |
 | v0.4.5 | Stufe 2a (Aufgabe 01): Frame-Baum als reine, three-freie Datenstruktur (`src/frames/`). `createFrame`, `attachFrame`, `findLCA`, `transformPoint` mit präziser LCA-Ablösung. 7 Offline-Tests in `tools/test-frames.ts` inklusive Nah-bei-Nah-, Fern-, Roundtrip- (≤ 4 · ε · max|p|), Gegenprobe- und Bewegungs-Tests. |
+| v0.4.6 | Vorbereitung 2b (Aufgabe 02): `SpaceCamera.ts` unter den Dateideckel geteilt (473 → 244 Zeilen). Gesten- und Touch-Eingabe in `cameraTouch.ts` (three-frei), Platzierungs- und Near-Plane-Logik in `cameraPlacement.ts`. `CAP_BASELINE`-Eintrag für `SpaceCamera.ts` entfernt. |
 
 ---
 

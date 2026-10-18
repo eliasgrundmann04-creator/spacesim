@@ -24,6 +24,7 @@ const OUT = 'docs/contracts.md';
 const THREE_FREE = [
   'src/frames/',
   'src/nav/',
+  'src/camera/cameraTouch.ts',
   'src/terrain/tileGeometry.ts',
   'src/terrain/noise.ts',
   'src/math/rng.ts',
@@ -34,7 +35,6 @@ const LINE_CAP = 300;
 /** Bestand über dem Deckel bei Einführung (v0.4.1). Wert = Obergrenze, nicht Ziel. */
 const CAP_BASELINE = {
   'src/core/Engine.ts': 496,
-  'src/camera/SpaceCamera.ts': 473,
   'src/terrain/TerrainProvider.ts': 442,
   'src/terrain/gpuTerrain.ts': 361,
   'src/terrain/tileGeometry.ts': 307,
