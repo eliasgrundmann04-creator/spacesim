@@ -8,7 +8,9 @@
 
 | Datei | three | Kern | Deckel | hängt ab von |
 |---|---|---|---|---|
-| `camera/SpaceCamera.ts` | direkt |  | ⚠ | core/constants, math/Vector3d, nav/dragKernel, nav/fling, nav/orientation, nav/vec, universe/CelestialBody |
+| `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, math/Vector3d, nav/dragKernel, nav/orientation, nav/vec, universe/CelestialBody |
+| `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
+| `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/fling, nav/vec |
 | `core/Engine.ts` | direkt |  | ⚠ | camera/SpaceCamera, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/format, nav/picking, nav/types, nav/vec, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
@@ -84,6 +86,22 @@
   - `get altitude(): number`
   - `resize(width: number, height: number): void`
   - `get fovYRadians(): number`
+
+### `camera/cameraPlacement.ts`
+
+- `interface OrbitPlacementState { distance, targetDistance }`
+- `function clampToSurface(worldPosition: Vector3d, body: CelestialBody, radialScratch: THREE.Vector3): { normal: { x: number; y: number; z: number } | null }`
+- `function placeOrbit(worldPosition: Vector3d, target: CelestialBody | null, state: OrbitPlacementState, viewVector: THREE.Vector3, radialScratch: THREE.Vector3, dt: number): OrbitPlacementState`
+- `function applyDolly(worldPosition: Vector3d, viewVector: THREE.Vector3, freeAltitude: number, pendingDolly: number): void`
+- `function computeNearPlane(altitude: number): number`
+
+### `camera/cameraTouch.ts`
+
+- `interface PointerState { x, y }`
+- `interface CameraTouchCallbacks { getFovYRadians, getOrbitView, getMode, applyStep, zoomBy }`
+- `class CameraTouchInput`
+  - `readonly fling: Fling`
+  - `constructor(private readonly dom: HTMLElement, private readonly callbacks: CameraTouchCallbacks)`
 
 ### `core/Engine.ts`
 

@@ -1,7 +1,7 @@
 ---
 id: 02
 titel: SpaceCamera.ts unter den Dateideckel teilen
-status: offen
+status: erledigt
 braucht: [00]
 stufe: — (Vorbereitung 2b)
 tablet: ja
