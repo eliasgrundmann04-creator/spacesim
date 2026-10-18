@@ -6,10 +6,11 @@
 //   · im Freiflug drehte sich das Bild nach schrägen Gesten um seine Mitte
 //   · der erste Neuversuch ruckte: unbegrenzte Drehung am Planetenrand, Wurf aus
 //     einem einzelnen 1-ms-Event, Wurf nach einer Pause
+//   · Aufgabe 08: hinter dem Planetenrand blieb die Umrundung stehen; Zwei-Finger-Drehen fehlte
 
 import {
-  GRAB_EDGE, GRAB_MIN_PX, LOOK_RATE, applyTurn, chooseDrag, dragTurn, grabAngle, grabPoint,
-  surfaceAngle, turnBetween,
+  GRAB_EDGE, GRAB_MIN_PX, LOOK_RATE, TWIST_START, applyTurn, beginTwist, chooseDrag, dragTurn, exactLimit,
+  grabPoint, surfaceAngle, turnBetween, twistTurn,
 } from '../src/nav/dragKernel';
 import type { DragKind, DragView, OrbitView, ScreenPoint } from '../src/nav/dragKernel';
 import { FLING_REST, Fling, MAX_SPIN, SPIN_TAU } from '../src/nav/fling';
@@ -126,7 +127,7 @@ section('2. Orbit: der berührte Bodenpunkt bleibt unter dem Finger');
       const hit = raycast(p, o);
       if (!hit) continue;
       const alpha = Math.acos(-localRay(p).z);
-      if (grabAngle(alpha, eps(o)) !== surfaceAngle(alpha, eps(o))) continue; // Randzone: s. Abschnitt 3
+      if (alpha > exactLimit(eps(o))) continue; // hinter der exakten Zone: s. Abschnitt 3
       maxErr = Math.max(maxErr, angleOf(grabPoint(p, VIEW, eps(o)), hit));
     }
   }
@@ -191,23 +192,57 @@ for (const k of [1.5, 3, 6, 15]) {
   check(`d = ${k} R: Gegenprobe exakter Treffer wächst zum Rand ohne Grenze`, growth > 5 && near > bound,
     `0,5 → 0,005 px vor dem Rand: ×${growth.toFixed(1)}, dort ${(near / bound).toFixed(0)} × Grenze`);
 }
+section('3b. Über den Rand hinaus: die Umrundung läuft weiter (Gegenprobe: harter Wechsel auf die Orbit-Rate)');
 {
-  // Finger über den Rand hinaus und zurück: derselbe Bodenpunkt liegt wieder unter dem Finger
-  const o = orbitAt(4);
-  const start = { x: CENTER.x - 50, y: CENTER.y + 30 };
-  const out = { x: CENTER.x + 520, y: CENTER.y - 150 };
-  const path = [...line(start, out, 600), ...line(out, { x: CENTER.x + 400, y: CENTER.y + 300 }, 300).slice(1),
-    ...line({ x: CENTER.x + 400, y: CENTER.y + 300 }, start, 500).slice(1)];
-  const q = drag('grab', path, o).q;
-  const back = angleOf(rotateByQuat(q, grabPoint(start, VIEW, eps(o))), grabPoint(start, VIEW, eps(o)));
-  check('über den Rand hinaus und zurück: Griffpunkt wieder unter dem Finger', back / (A0 * eps(o)) < 1e-6,
-    `Schlupf ${exp(back / (A0 * eps(o)))} px`);
-  // Der Griffpunkt geht nie über den Horizont
-  let maxTheta = 0;
-  for (let x = 0; x <= VIEW.width; x += 7) maxTheta = Math.max(maxTheta, Math.acos(grabPoint({ x, y: 13 }, VIEW, eps(o)).z));
-  const horizon = Math.atan(Math.sqrt(eps(o) * (2 + eps(o))));
-  check('Griffpunkt bleibt diesseits des Horizonts', maxTheta < horizon,
-    `Abstand zum Horizont min. ${exp(horizon - maxTheta)} rad`);
+  // Sprung am Rand mit 0,01-px-Schritten: misst die Stufe, nicht die Krümmung des exakten Griffs
+  const DELTA = 0.01;
+  for (const k of [1.5, 3, 6, 15]) {
+    const o = orbitAt(k);
+    const edgePx = Math.tan(exactLimit(eps(o))) / A0;
+    const perPx = (a: ScreenPoint, b: ScreenPoint, kind: DragKind = 'grab'): number =>
+      length(dragTurn(kind, a, b, VIEW, o)) / Math.hypot(b.x - a.x, b.y - a.y);
+    const at = (phi: number, px: number): ScreenPoint => ({ x: CENTER.x + Math.cos(phi) * px, y: CENTER.y + Math.sin(phi) * px });
+    let step = 0;
+    let hard = 0;
+    for (let az = 0; az < 6; az++) {
+      const phi = az * 1.047 + 0.3;
+      const edge = at(phi, edgePx);
+      for (const beta of [0, 30, 60, 85]) {
+        const b = phi + (beta * Math.PI) / 180; // Zugrichtung, um β gegen radial gedreht
+        const inner = { x: edge.x - Math.cos(b) * DELTA, y: edge.y - Math.sin(b) * DELTA };
+        const outer = { x: edge.x + Math.cos(b) * DELTA, y: edge.y + Math.sin(b) * DELTA };
+        const rin = perPx(inner, edge);
+        step = Math.max(step, Math.abs(perPx(edge, outer) / rin - 1));
+        hard = Math.max(hard, Math.abs(perPx(edge, outer, 'orbit') / rin - 1));
+      }
+    }
+    check(`d = ${k} R: Drehung je px stetig über den Rand (Stufe ≤ 5 %)`, step <= 0.05,
+      `größte Stufe ${(step * 100).toFixed(3)} % bei Rand ${edgePx.toFixed(0)} px, β = 0…85°`);
+    check(`d = ${k} R: Gegenprobe harter Wechsel auf die Orbit-Rate springt`, hard > 0.05,
+      `Stufe bis ${(hard * 100).toFixed(0)} %`);
+
+    // Ganz außerhalb: Achse in der Bildebene, Richtung wie 'orbit' (der Körper folgt dem Finger)
+    let zMax = 0;
+    let cosMin = 1;
+    let far = Infinity;
+    for (let az = 0; az < 12; az++) {
+      const phi = az * 0.52 + 0.1;
+      for (let px = edgePx + 1; px < edgePx + 400; px++) {
+        const v = dragTurn('grab', at(phi, px), at(phi, px + 1), VIEW, o);
+        const w = dragTurn('grab', at(phi, px), at(phi + 1 / px, px), VIEW, o); // 1 px quer
+        zMax = Math.max(zMax, Math.abs(v.z), Math.abs(w.z));
+        const vo = dragTurn('orbit', at(phi, px), at(phi, px + 1), VIEW, o);
+        cosMin = Math.min(cosMin, dot(v, vo) / (length(v) * length(vo)));
+      }
+      const p200 = edgePx + 200;
+      far = Math.min(far, perPx(at(phi, p200), at(phi, p200 + 1)), perPx(at(phi, p200), at(phi + 1 / p200, p200)));
+    }
+    const orbitPx = perPx(CENTER, { x: CENTER.x + 1, y: CENTER.y }, 'orbit');
+    check(`d = ${k} R: außerhalb z = 0, Körper folgt dem Finger`, zMax === 0 && cosMin > 1 - 1e-12,
+      `max |z| = ${zMax}, Richtung zu 'orbit' cos ≥ ${cosMin.toFixed(15)}`);
+    check(`d = ${k} R: 200 px hinter dem Rand dreht es weiter`, far >= orbitPx * (1 - 1e-9),
+      `${exp(far)} rad/px = ${(far / orbitPx).toFixed(3)} × Orbit-Rate`);
+  }
 }
 
 // — 4. Bodennähe ———————————————————————————————————————————————————
@@ -371,6 +406,90 @@ section('8. Nachlauf: Gesamtweg unabhängig von der Framerate (Gegenprobe: ω·d
     if (c) q = applyTurn(q, c);
   }
   check('ohne Wurf dreht sich nichts (10 s)', q.x === before.x && q.y === before.y && q.z === before.z && q.w === before.w);
+}
+
+section('9. Zwei-Finger-Drehen: Totzone 8°, danach 1:1 ohne Sprung (Gegenprobe: ganzer Winkel beim Einrasten)');
+{
+  const DEG = Math.PI / 180;
+  /** Fingerpaar um p im Abstand 2r, Fingerlinie im Winkel phi (Bild-y nach unten). */
+  const pair = (phi: number, r = 150, p: ScreenPoint = CENTER): [ScreenPoint, ScreenPoint] => [
+    { x: p.x - Math.cos(phi) * r, y: p.y - Math.sin(phi) * r },
+    { x: p.x + Math.cos(phi) * r, y: p.y + Math.sin(phi) * r },
+  ];
+  /** Fingerpaare nacheinander; liefert die Bild-Drehungen je Schritt. */
+  const run = (pairs: [ScreenPoint, ScreenPoint][]): Vec3[] => {
+    let t = beginTwist(pairs[0][0], pairs[0][1]);
+    const out: Vec3[] = [];
+    for (const [a, b] of pairs.slice(1)) {
+      const r = twistTurn(t, a, b);
+      t = r.twist;
+      out.push(r.turn);
+    }
+    return out;
+  };
+  const sweep = (phi0: number, angles: number[]): Vec3[] => run([pair(phi0), ...angles.map((a) => pair(a))]);
+  const sumZ = (vs: Vec3[]): number => vs.reduce((s, v) => s + v.z, 0);
+
+  // Totzone: bis 7,9° in beide Richtungen, mit Hin und Her
+  const wobble = [0.5, 2, 4.5, 7.9, 6, 3, -1, -4, -7.9, -2, 1].map((d) => (20 + d) * DEG);
+  const dead = sweep(20 * DEG, wobble);
+  check('Totzone: unter 8° dreht nichts', dead.every((v) => v.x === 0 && v.y === 0 && v.z === 0),
+    `${dead.length} Schritte bis ±7,9°, alle (0, 0, 0)`);
+
+  // Einsetzen: 0,7°-Schritte über die Schwelle — der erste Schritt bringt nur den Überschuss
+  const steps = Array.from({ length: 20 }, (_, i) => (i + 1) * 0.7 * DEG);
+  const onset = sweep(0, steps);
+  const first = onset.find((v) => v.z !== 0);
+  const maxStep = Math.max(...onset.map((v) => Math.abs(v.z)));
+  check('kein Sprung beim Einsetzen', maxStep <= 0.7 * DEG * (1 + 1e-9) && !!first && first.z < 0.7 * DEG,
+    `größter Bildschritt ${(maxStep / DEG).toFixed(3)}° bei 0,7°-Fingerschritten, erster ${((first?.z ?? 0) / DEG).toFixed(3)}°` +
+    ` (ganzer Winkel beim Einrasten wäre ${(8.4).toFixed(1)}°)`);
+
+  // 1:1 danach, vor und zurück, über ±180° hinweg
+  const path = [10, 4, 25, 18, 40, 39.5, 12, 30].map((d) => (170 + d) * DEG);
+  const loose = sweep(170 * DEG, path);
+  let follow = 0;
+  for (let i = 1; i < path.length; i++) follow = Math.max(follow, Math.abs(loose[i].z - (path[i] - path[i - 1])));
+  const net = sumZ(loose) - (path[path.length - 1] - 170 * DEG - TWIST_START);
+  check('danach 1:1 (auch rückwärts, über ±180°)', follow < 1e-12 && Math.abs(net) < 1e-12,
+    `max. Abweichung je Schritt ${exp(follow)} rad, Summe − (Fingerwinkel − 8°) = ${exp(net)} rad`);
+
+  // Vorzeichen: Finger im Uhrzeigersinn ⇒ ein Bildpunkt wandert im Uhrzeigersinn um die Mitte
+  const cw = sweep(0, Array.from({ length: 30 }, (_, i) => (i + 1) * DEG));
+  const q = applyTurn(quat(), vec3(0, 0, sumZ(cw)));
+  const p0 = { x: CENTER.x + 200, y: CENTER.y - 120 };
+  const d = rotateByQuat(quat(-q.x, -q.y, -q.z, q.w), localRay(p0)); // Weltrichtung im neuen Kamerarahmen
+  const half = Math.tan(VIEW.fovY / 2);
+  const p1 = { x: CENTER.x + (d.x / -d.z / half) * (VIEW.height / 2), y: CENTER.y - (d.y / -d.z / half) * (VIEW.height / 2) };
+  const moved = Math.atan2(p1.y - CENTER.y, p1.x - CENTER.x) - Math.atan2(p0.y - CENTER.y, p0.x - CENTER.x);
+  check('Vorzeichen: das Bild folgt den Fingern', Math.abs(moved - 22 * DEG) < 1e-9,
+    `Finger +30° (im Uhrzeigersinn) ⇒ Bildpunkt ${(moved / DEG).toFixed(6)}°, erwartet +22°`);
+
+  // Eventdichte: derselbe Fingerweg in 10, 40 und 160 Events ergibt dieselbe Drehung
+  const totals = [10, 40, 160].map((n) => sumZ(sweep(0, Array.from({ length: n }, (_, i) => ((i + 1) / n) * 40 * DEG))));
+  const spread = Math.max(...totals) - Math.min(...totals);
+  check('Drehung unabhängig von der Eventdichte', spread < 1e-12 && Math.abs(totals[0] - 32 * DEG) < 1e-12,
+    `${(totals[0] / DEG).toFixed(9)}°, Streuung ${exp(spread)} rad`);
+
+  // Reiner Pinch und Schwenk ohne Drehung der Fingerlinie: z = 0
+  const pinch: [ScreenPoint, ScreenPoint][] = [];
+  for (let i = 0; i <= 60; i++) pinch.push(pair(0.37, 60 + i * 4 + (i % 3) * 9, { x: CENTER.x + i * 2.5, y: CENTER.y - i }));
+  const flat = run(pinch);
+  check('reiner Pinch ohne Drehung ⇒ z = 0', flat.every((v) => v.z === 0), `${flat.length} Schritte, Abstand 120 → 618 px`);
+
+  // Wurf über die vorhandene Fling-Aufzeichnung: 3 rad/s, Events alle 1/60 s
+  const f = new Fling();
+  f.press(0);
+  let t = beginTwist(...pair(0));
+  for (let i = 1; i <= 30; i++) {
+    const r = twistTurn(t, ...pair((3 * i) / 60));
+    t = r.twist;
+    f.record(i / 60, r.turn);
+  }
+  f.release(30 / 60 + 0.004);
+  const w = f.angularVelocity;
+  check('Wurf aus dem Drehen: um die Blickachse, 3 rad/s', w.x === 0 && w.y === 0 && Math.abs(w.z - 3) / 3 < 1e-9,
+    `ω = (${w.x}, ${w.y}, ${w.z.toFixed(12)}) rad/s`);
 }
 
 // — Ergebnis ——————————————————————————————————————————————————————
