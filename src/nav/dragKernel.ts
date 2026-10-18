@@ -1,7 +1,7 @@
 import type { Vec3 } from './vec';
 import { cross, dot, length, scale, vec3 } from './vec';
 import type { Quat } from './orientation';
-import { mulQuat, normalizeQuat, quatFromAxisAngle } from './orientation';
+import { mulQuat, normalizeQuat, quat, quatFromAxisAngle } from './orientation';
 
 /**
  * Zieh-Geste → Drehung der Kamera. Kein three.js, kein DOM (§5).
@@ -9,14 +9,14 @@ import { mulQuat, normalizeQuat, quatFromAxisAngle } from './orientation';
  * Jede Geste ergibt einen **Drehvektor im Kamerarahmen** (Achse · Winkel; x = rechts,
  * y = oben, z = Blickachse rückwärts). Die Kamera hängt ihn mit `applyTurn` an ihre
  * Orientierung an. Eine z-Komponente dreht das Bild um seine Mitte — sie entsteht
- * nur, wo der Finger sie verlangt (Griff am Rand eines Globus), sonst nie.
+ * nur, wo die Finger sie verlangen (Griff auf einem Globus, Zwei-Finger-Drehen), sonst nie.
  *
  * Drei Arten, festgelegt beim Aufsetzen des Fingers (`chooseDrag`):
  *
  *   look  — Freiflug. Drehung um die Bildachse senkrecht zum Zug, z = 0.
  *           Der Inhalt folgt dem Finger.
  *   grab  — Orbit, Finger auf dem Körper. Der berührte Bodenpunkt bleibt unter dem
- *           Finger (Globus-Steuerung).
+ *           Finger (Globus-Steuerung); über den Rand hinaus läuft die Umrundung weiter.
  *   orbit — Orbit, Finger daneben oder Körper kleiner als eine Fingerkuppe. Wie look,
  *           aber der *Körper* folgt dem Finger, nicht der Himmel; z = 0.
  *
@@ -50,6 +50,10 @@ export const LOOK_RATE = 2.2;
 export const GRAB_EDGE = 4;
 /** Kleinere Scheiben (Radius in CSS-px) werden umkreist statt gegriffen. */
 export const GRAB_MIN_PX = 40;
+/** Hinter dem Rand der exakten Zone klingt die Griffrate auf dieser Länge (CSS-px) auf die Orbit-Rate ab. */
+export const EDGE_FADE_PX = 150;
+/** Zwei-Finger-Drehen setzt erst ab diesem Winkel (rad) seit Pinch-Beginn ein. */
+export const TWIST_START = (8 * Math.PI) / 180;
 
 export function chooseDrag(p: ScreenPoint, view: DragView, orbit: OrbitView | null): DragKind {
   if (!orbit) return 'look';
@@ -81,10 +85,96 @@ export function dragTurn(
     const k = orbitRate(view, eps);
     return vec3(-dy * k, -dx * k, 0);
   }
-  // Griff: die Drehung, die den Kugelpunkt unter dem neuen Fingerort dorthin bringt,
-  // wo der unter dem alten lag. Damit bleibt der einmal gegriffene Weltpunkt über
-  // den ganzen Zug derselbe — Schritt für Schritt exakt, ohne ihn zu speichern.
-  return turnBetween(grabPoint(to, view, eps), grabPoint(from, view, eps));
+  // Griff: der Zug wird an der Grenze der exakten Zone geteilt, die Teile nacheinander angehängt
+  const a = screenPlane(from, view);
+  const b = screenPlane(to, view);
+  const [lo, hi] = discSpan(a.sx, a.sy, b.sx - a.sx, b.sy - a.sy, Math.tan(exactLimit(eps)));
+  const at = (t: number): ScreenPoint =>
+    t <= 0 ? from : t >= 1 ? to : { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+  const parts: Vec3[] = [];
+  if (lo > 0) parts.push(edgeTurn(from, at(lo), view, eps));
+  // Innen: die Drehung, die den Kugelpunkt unter dem neuen Fingerort dorthin bringt, wo der
+  // unter dem alten lag — der gegriffene Weltpunkt bleibt Schritt für Schritt exakt erhalten.
+  if (hi > lo) parts.push(turnBetween(grabPoint(at(hi), view, eps), grabPoint(at(lo), view, eps)));
+  if (hi < 1) parts.push(edgeTurn(at(hi), to, view, eps));
+  return parts.length === 1 ? parts[0] : composeTurns(parts);
+}
+
+/**
+ * Zugschritt hinter dem Rand der exakten Zone: wie `orbit` (Achse ⊥ Fingerbewegung, z = 0,
+ * der Körper folgt dem Finger), die Umrundung läuft also weiter, statt am Horizont zu sättigen.
+ * Am Rand schließt der Betrag stetig an den exakten Griff an — radial GRAB_EDGE · ε je rad
+ * Strahlwinkel, quer dazu sin θ / tan α —, je nach Zugrichtung gemischt, und klingt mit
+ * EDGE_FADE_PX auf die Orbit-Rate ab. Der Griffpunkt liegt nach dem Zurückziehen nicht mehr
+ * unter dem Finger (Inhaberentscheidung, Aufgabe 08).
+ */
+function edgeTurn(from: ScreenPoint, to: ScreenPoint, view: DragView, eps: number): Vec3 {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy);
+  if (!(len > 0)) return vec3();
+  const { sx, sy } = screenPlane({ x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }, view);
+  const rho = Math.hypot(sx, sy);
+  const perPx = (2 * Math.tan(view.fovY / 2)) / Math.max(view.height, 1); // Bildebene je px
+  const alpha = exactLimit(eps);
+  const fade = Math.exp(-Math.max(0, rho - Math.tan(alpha)) / perPx / EDGE_FADE_PX);
+  const base = orbitRate(view, eps);
+  const radial = base + (GRAB_EDGE * eps * Math.cos(alpha) ** 2 * perPx - base) * fade;
+  const across = base + ((Math.sin(surfaceAngle(alpha, eps)) / Math.tan(alpha)) * perPx - base) * fade;
+  const c = rho > 0 ? (dx * sx - dy * sy) / (len * rho) : 0; // cos(Zug, radial); Bild-y zeigt nach unten
+  const k = Math.sqrt(radial * radial * c * c + across * across * Math.max(0, 1 - c * c));
+  return vec3(-dy * k, -dx * k, 0);
+}
+
+/** Abschnitt [lo, hi] von p + t·d (t ∈ [0, 1]) innerhalb des Kreises vom Radius r; leer ⇒ lo = hi = 1. */
+function discSpan(px: number, py: number, dx: number, dy: number, r: number): [number, number] {
+  const dd = dx * dx + dy * dy;
+  const pd = px * dx + py * dy;
+  const c = px * px + py * py - r * r;
+  if (!(dd > 0)) return c <= 0 ? [0, 1] : [1, 1];
+  const disc = pd * pd - dd * c;
+  if (!(disc > 0)) return [1, 1];
+  const root = Math.sqrt(disc);
+  const lo = Math.min(1, Math.max(0, (-pd - root) / dd));
+  const hi = Math.min(1, Math.max(0, (-pd + root) / dd));
+  return hi > lo ? [lo, hi] : [1, 1];
+}
+
+/** Drehvektoren nacheinander anhängen und als einen zurückgeben. */
+function composeTurns(parts: Vec3[]): Vec3 {
+  let q = quat();
+  for (const v of parts) q = applyTurn(q, v);
+  if (q.w < 0) q = { x: -q.x, y: -q.y, z: -q.z, w: -q.w };
+  const s = Math.hypot(q.x, q.y, q.z);
+  if (!(s > 0)) return vec3();
+  return scale(vec3(q.x, q.y, q.z), (2 * Math.atan2(s, q.w)) / s);
+}
+
+/** Zwei-Finger-Drehen: Winkel der Fingerlinie (Bild-y nach unten), Summe seit Pinch-Beginn, eingerastet. */
+export interface Twist {
+  angle: number;
+  total: number;
+  engaged: boolean;
+}
+
+export function beginTwist(a: ScreenPoint, b: ScreenPoint): Twist {
+  return { angle: Math.atan2(b.y - a.y, b.x - a.x), total: 0, engaged: false };
+}
+
+/**
+ * Drehvektor (0, 0, Δφ) aus der Winkeländerung der Fingerlinie: das Bild dreht mit den Fingern
+ * um seine Mitte (Finger im Uhrzeigersinn ⇒ Δφ > 0 ⇒ Kamera rollt gegen ihn, das Bild mit). Bis TWIST_START
+ * nichts, denn jeder Pinch dreht ein wenig mit; beim Einrasten nur der Überschuss — kein Sprung —,
+ * danach 1:1 in beide Richtungen.
+ */
+export function twistTurn(t: Twist, a: ScreenPoint, b: ScreenPoint): { twist: Twist; turn: Vec3 } {
+  if (!(Math.hypot(b.x - a.x, b.y - a.y) > 0)) return { twist: t, turn: vec3() }; // keine Linie
+  const angle = Math.atan2(b.y - a.y, b.x - a.x);
+  const delta = Math.atan2(Math.sin(angle - t.angle), Math.cos(angle - t.angle)); // über ±π hinweg
+  const total = t.total + delta;
+  const engaged = t.engaged || Math.abs(total) >= TWIST_START;
+  const z = t.engaged ? delta : engaged ? Math.sign(total) * (Math.abs(total) - TWIST_START) : 0;
+  return { twist: { angle, total, engaged }, turn: vec3(0, 0, z) };
 }
 
 /** Drehvektor im Kamerarahmen anhängen: q ⊗ exp(v). */
@@ -103,35 +193,17 @@ export function turnBetween(a: Vec3, b: Vec3): Vec3 {
 }
 
 /**
- * Gegriffener Kugelpunkt unter einem Bildschirmpunkt: Einheitsrichtung vom Zentrum,
- * im Kamerarahmen (+z zeigt zur Kamera). Die Kamera blickt im Orbit genau aufs Zentrum,
+ * Gegriffener Kugelpunkt unter einem Bildschirmpunkt der exakten Zone: Einheitsrichtung vom
+ * Zentrum, im Kamerarahmen (+z zeigt zur Kamera). Die Kamera blickt im Orbit genau aufs Zentrum,
  * der Punkt liegt also in der Ebene aus Blickachse und Fingerstrahl.
  */
 export function grabPoint(p: ScreenPoint, view: DragView, eps: number): Vec3 {
   const { sx, sy } = screenPlane(p, view);
   const rho = Math.hypot(sx, sy);
   if (!(rho > 0)) return vec3(0, 0, 1);
-  const theta = grabAngle(Math.atan(rho), eps);
+  const theta = surfaceAngle(Math.atan(rho), eps);
   const s = Math.sin(theta) / rho;
   return vec3(sx * s, sy * s, Math.cos(theta));
-}
-
-/**
- * Zentriwinkel θ des gegriffenen Punkts für einen Fingerstrahl im Winkel α zur Blickachse.
- *
- * Innen exakt (`surfaceAngle`). Zum Rand hin wird der exakte Griff beliebig empfindlich —
- * am Horizont unendlich viele Grad je Pixel — und dahinter gibt es keinen Treffer mehr.
- * Ab `exactLimit` geht es deshalb mit derselben Steigung weiter, die sanft gegen den
- * Horizont sättigt: stetig differenzierbar, Drehung je Pixel überall ≤ GRAB_EDGE · ε,
- * und der Griffpunkt wandert nie über den Horizont.
- */
-export function grabAngle(alpha: number, eps: number): number {
-  const limit = exactLimit(eps);
-  if (alpha <= limit) return surfaceAngle(alpha, eps);
-  const at = surfaceAngle(limit, eps);
-  const span = Math.atan(Math.sqrt(eps * (2 + eps))) - at; // Rest bis zum Horizont
-  if (!(span > 0)) return at;
-  return at + span * (1 - Math.exp((-(alpha - limit) * GRAB_EDGE * eps) / span));
 }
 
 /**
@@ -149,11 +221,12 @@ export function surfaceAngle(alpha: number, eps: number): number {
 }
 
 /**
- * Strahlwinkel, bis zu dem der Griff exakt ist: dort ist dθ/dα = GRAB_EDGE · ε.
+ * Strahlwinkel, bis zu dem der Griff exakt ist: dort ist dθ/dα = GRAB_EDGE · ε. Näher am Rand
+ * würde der exakte Griff beliebig empfindlich — am Horizont unendlich viele Grad je Pixel.
  * Aus dθ/dα = k cos α / √(1 − k² sin² α) − 1 nach sin² α aufgelöst; ε kürzt sich heraus,
  * deshalb auch am Boden (ε → 0) wohldefiniert: dort sind es 60°, mehr als der Bildschirm zeigt.
  */
-function exactLimit(eps: number): number {
+export function exactLimit(eps: number): number {
   const e = GRAB_EDGE;
   const k = 1 + eps;
   const sin2 = ((e - 1) * ((e + 1) * eps + 2)) / (k * k * e * (e * eps + 2));

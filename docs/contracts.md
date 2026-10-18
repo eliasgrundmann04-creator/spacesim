@@ -222,13 +222,18 @@
 - `const LOOK_RATE`
 - `const GRAB_EDGE`
 - `const GRAB_MIN_PX`
+- `const EDGE_FADE_PX`
+- `const TWIST_START`
 - `function chooseDrag(p: ScreenPoint, view: DragView, orbit: OrbitView | null): DragKind`
 - `function dragTurn(kind: DragKind, from: ScreenPoint, to: ScreenPoint, view: DragView, orbit: OrbitView | null): Vec3`
+- `interface Twist { angle, total, engaged }`
+- `function beginTwist(a: ScreenPoint, b: ScreenPoint): Twist`
+- `function twistTurn(t: Twist, a: ScreenPoint, b: ScreenPoint): { twist: Twist; turn: Vec3 }`
 - `function applyTurn(q: Quat, v: Vec3): Quat`
 - `function turnBetween(a: Vec3, b: Vec3): Vec3`
 - `function grabPoint(p: ScreenPoint, view: DragView, eps: number): Vec3`
-- `function grabAngle(alpha: number, eps: number): number`
 - `function surfaceAngle(alpha: number, eps: number): number`
+- `function exactLimit(eps: number): number`
 
 ### `nav/flightKernel.ts`
 

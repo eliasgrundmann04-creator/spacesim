@@ -1,8 +1,8 @@
-import type { DragKind, DragView, OrbitView, ScreenPoint } from '../nav/dragKernel';
-import { chooseDrag, dragTurn } from '../nav/dragKernel';
+import type { DragKind, DragView, OrbitView, ScreenPoint, Twist } from '../nav/dragKernel';
+import { beginTwist, chooseDrag, dragTurn, twistTurn } from '../nav/dragKernel';
 import { Fling } from '../nav/fling';
 import type { Vec3 } from '../nav/vec';
-import { scale } from '../nav/vec';
+import { ZERO, add, scale } from '../nav/vec';
 
 /** Zwei-Finger-Schwenk dreht gedämpft mit. */
 const PAN_GAIN = 0.6;
@@ -30,6 +30,7 @@ export class CameraTouchInput {
   private pinchDistance = 0;
   private pinchX = 0;
   private pinchY = 0;
+  private twist: Twist = beginTwist({ x: 0, y: 0 }, { x: 1, y: 0 });
 
   constructor(
     private readonly dom: HTMLElement,
@@ -82,14 +83,10 @@ export class CameraTouchInput {
       this.fling.stop();
     });
 
-    dom.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        this.callbacks.zoomBy(Math.exp(e.deltaY * 0.0015));
-      },
-      { passive: false },
-    );
+    dom.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.callbacks.zoomBy(Math.exp(e.deltaY * 0.0015));
+    }, { passive: false });
 
     // iOS-Safari: Seiten-Zoom per Pinch unterbinden, damit die Geste bei uns ankommt
     for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
@@ -98,10 +95,10 @@ export class CameraTouchInput {
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  private turn(kind: DragKind, from: ScreenPoint, to: ScreenPoint, gain: number, time: number): void {
+  private turn(kind: DragKind, from: ScreenPoint, to: ScreenPoint, gain: number, time: number, extra = ZERO): void {
     const s = this.screen();
     const v = dragTurn(kind, s.local(from), s.local(to), s.view, this.callbacks.getOrbitView());
-    const step = scale(v, gain);
+    const step = add(scale(v, gain), extra);
     this.callbacks.applyStep(step);
     this.fling.record(time, step);
   }
@@ -130,6 +127,7 @@ export class CameraTouchInput {
     this.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y) || 1;
     this.pinchX = (a.x + b.x) / 2;
     this.pinchY = (a.y + b.y) / 2;
+    this.twist = beginTwist(a, b);
   }
 
   private updatePinch(time: number): void {
@@ -141,9 +139,11 @@ export class CameraTouchInput {
     if (this.pinchDistance > 0) {
       // Auseinanderziehen (dist wächst) ⇒ heranzoomen ⇒ Distanz sinkt
       this.callbacks.zoomBy(this.pinchDistance / dist);
-      // Zwei-Finger-Schwenk dreht mit, nie als Griff: zwei Finger halten keinen Punkt fest
+      // Schwenk dreht mit, nie als Griff (zwei Finger halten keinen Punkt); die Fingerlinie dreht das Bild
       const kind = this.callbacks.getMode() === 'orbit' ? 'orbit' : 'look';
-      this.turn(kind, { x: this.pinchX, y: this.pinchY }, { x: midX, y: midY }, PAN_GAIN, time);
+      const twist = twistTurn(this.twist, a, b);
+      this.twist = twist.twist;
+      this.turn(kind, { x: this.pinchX, y: this.pinchY }, { x: midX, y: midY }, PAN_GAIN, time, twist.turn);
     }
 
     this.pinchDistance = dist;
