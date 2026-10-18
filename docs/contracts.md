@@ -13,6 +13,8 @@
 | `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
 | `core/constants.ts` | — |  |  |  |
+| `frames/FrameTree.ts` | — | ✓ |  | frames/types, nav/vec |
+| `frames/types.ts` | — | ✓ |  | nav/vec |
 | `main.ts` | über core/Engine |  |  | core/Engine |
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
@@ -47,7 +49,8 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:throughput`
+- `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
 - `npm run test:orientation` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orientation.ts`
@@ -129,6 +132,17 @@
 - `const YEAR`
 - `const DEG`
 - `const J2000_UNIX_MS`
+
+### `frames/FrameTree.ts`
+
+- `function createFrame(id: string, name: string, position: Vec3 = ZERO): FrameNode`
+- `function attachFrame(child: FrameNode, parent: FrameNode | null): void`
+- `function findLCA(a: FrameNode, b: FrameNode): { lca: FrameNode; pathToLCAFromA: FrameNode[]; pathToLCAFromB: FrameNode[]; }`
+- `function transformPoint(p: Vec3, from: FrameNode, to: FrameNode): Vec3`
+
+### `frames/types.ts`
+
+- `interface FrameNode { id, name, parent, children, position }`
 
 ### `math/Vector3d.ts`
 
