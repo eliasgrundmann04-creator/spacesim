@@ -41,6 +41,9 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 04 | Entscheidungsvorlage Frame-Wechsel-Schwellen | 00 | nein |
 | 05 | Stufe 2b: Kamera hängt um | 01–04 | ja |
 | 06 | Stufe 2c: Körper und Katalog migrieren | 05 | ja |
+| 07 | Touch-Gesten: Globus folgt dem Finger | 00 | ja |
+| 08 | Orbit-Griff über den Rand, Zwei-Finger-Drehen | 07 | ja |
+| 09 | Kamera-Gefühl: Nachlauf, Drehschwelle, gleichmäßiger Orbit, `?feel=` | 08 | ja |
 
 **Eine nach der anderen.** 01–04 hängen nicht voneinander ab, aber parallele PRs kollidieren in
 `package.json` (Version), `docs/contracts.md` und Leitfaden §2/§11. Für ein Einpersonenprojekt kostet
