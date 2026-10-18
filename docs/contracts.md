@@ -21,9 +21,10 @@
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
 | `nav/Navigator.ts` | — | ✓ |  | nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
-| `nav/dragKernel.ts` | — | ✓ |  | nav/orientation, nav/vec |
+| `nav/dragKernel.ts` | — | ✓ |  | nav/feel, nav/orientation, nav/vec |
+| `nav/feel.ts` | — | ✓ |  |  |
 | `nav/flightKernel.ts` | — | ✓ |  | nav/proximity, nav/types, nav/vec |
-| `nav/fling.ts` | — | ✓ |  | nav/vec |
+| `nav/fling.ts` | — | ✓ |  | nav/feel, nav/vec |
 | `nav/format.ts` | — | ✓ |  |  |
 | `nav/gotoKernel.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/orientation.ts` | — | ✓ |  | nav/vec |
@@ -226,7 +227,7 @@
 - `const TWIST_START`
 - `function chooseDrag(p: ScreenPoint, view: DragView, orbit: OrbitView | null): DragKind`
 - `function dragTurn(kind: DragKind, from: ScreenPoint, to: ScreenPoint, view: DragView, orbit: OrbitView | null): Vec3`
-- `interface Twist { angle, total, engaged }`
+- `interface Twist { angle, total, engaged, initialDist, locked }`
 - `function beginTwist(a: ScreenPoint, b: ScreenPoint): Twist`
 - `function twistTurn(t: Twist, a: ScreenPoint, b: ScreenPoint): { twist: Twist; turn: Vec3 }`
 - `function applyTurn(q: Quat, v: Vec3): Quat`
@@ -234,6 +235,15 @@
 - `function grabPoint(p: ScreenPoint, view: DragView, eps: number): Vec3`
 - `function surfaceAngle(alpha: number, eps: number): number`
 - `function exactLimit(eps: number): number`
+
+### `nav/feel.ts`
+
+- `interface FeelConfig { spinTau, maxSpin, flingRest, grabEdge, edgeFadePx, twistStartDeg, twistDominance, pinchLockPx }`
+- `interface FeelRange { min, max }`
+- `const FEEL_RANGES: Record<keyof FeelConfig, FeelRange>`
+- `const DEFAULT_FEEL: Readonly<FeelConfig>`
+- `const FEEL: FeelConfig`
+- `function parseFeel(search: string): void`
 
 ### `nav/flightKernel.ts`
 

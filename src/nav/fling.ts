@@ -1,5 +1,6 @@
 import type { Vec3 } from './vec';
 import { add, length, scale, sub, vec3 } from './vec';
+import { FEEL } from './feel';
 
 /**
  * Nachlauf (Wurf) einer Zieh-Geste. Kein three.js, kein DOM (§5).
@@ -19,13 +20,13 @@ import { add, length, scale, sub, vec3 } from './vec';
  */
 
 /** Zeitkonstante des Nachlaufs in s. */
-export const SPIN_TAU = 0.2;
+export const SPIN_TAU = FEEL.spinTau;
 /** Obergrenze der Wurfgeschwindigkeit in rad/s. */
-export const MAX_SPIN = 12;
+export const MAX_SPIN = FEEL.maxSpin;
 /** Mittelungsfenster vor dem Loslassen in s. */
 export const FLING_WINDOW = 0.1;
 /** So lange still vor dem Loslassen ⇒ kein Wurf (s). */
-export const FLING_REST = 0.05;
+export const FLING_REST = FEEL.flingRest;
 /** Kürzeste Messdauer in s — ein einzelnes Event nach 1 ms ist kein Maß. */
 const MIN_SPAN = 0.016;
 /** Restwinkel in rad, ab dem der Nachlauf auf einmal zu Ende geführt wird. */
@@ -75,19 +76,20 @@ export class Fling {
   coast(dt: number): Vec3 | null {
     const w = length(this.spin);
     if (!(w > 0) || !(dt > 0)) return null;
-    const decay = Math.exp(-dt / SPIN_TAU);
-    if (w * SPIN_TAU * decay < STOP_ANGLE) {
-      const rest = scale(this.spin, SPIN_TAU); // genau der verbleibende Weg
+    const spinTau = FEEL.spinTau;
+    const decay = Math.exp(-dt / spinTau);
+    if (w * spinTau * decay < STOP_ANGLE) {
+      const rest = scale(this.spin, spinTau); // genau der verbleibende Weg
       this.spin = vec3();
       return rest;
     }
-    const turn = scale(this.spin, SPIN_TAU * (1 - decay));
+    const turn = scale(this.spin, spinTau * (1 - decay));
     this.spin = scale(this.spin, decay);
     return turn;
   }
 
   private velocity(time: number): Vec3 {
-    if (time - this.lastTime > FLING_REST) return vec3();
+    if (time - this.lastTime > FEEL.flingRest) return vec3();
     const recent = this.steps.filter((s) => s.t1 >= time - FLING_WINDOW);
     if (recent.length === 0) return vec3();
 
@@ -112,6 +114,7 @@ export class Fling {
       : scale(path[path.length - 1], 1 / MIN_SPAN);
     const l = length(w);
     if (!Number.isFinite(l)) return vec3();
-    return l > MAX_SPIN ? scale(w, MAX_SPIN / l) : w;
+    const maxSpin = FEEL.maxSpin;
+    return l > maxSpin ? scale(w, maxSpin / l) : w;
   }
 }

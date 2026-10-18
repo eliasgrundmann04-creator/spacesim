@@ -2,6 +2,7 @@ import type { Vec3 } from './vec';
 import { cross, dot, length, scale, vec3 } from './vec';
 import type { Quat } from './orientation';
 import { mulQuat, normalizeQuat, quat, quatFromAxisAngle } from './orientation';
+import { FEEL } from './feel';
 
 /**
  * Zieh-Geste → Drehung der Kamera. Kein three.js, kein DOM (§5).
@@ -47,13 +48,13 @@ export type DragKind = 'look' | 'orbit' | 'grab';
 /** Freiflug-Rate: rad je Länge der kürzeren Bildschirmkante. */
 export const LOOK_RATE = 2.2;
 /** Der Griff ist exakt, bis der Boden dort GRAB_EDGE-mal schneller läuft als in Bildmitte. */
-export const GRAB_EDGE = 4;
+export const GRAB_EDGE = FEEL.grabEdge;
 /** Kleinere Scheiben (Radius in CSS-px) werden umkreist statt gegriffen. */
 export const GRAB_MIN_PX = 40;
 /** Hinter dem Rand der exakten Zone klingt die Griffrate auf dieser Länge (CSS-px) auf die Orbit-Rate ab. */
-export const EDGE_FADE_PX = 150;
+export const EDGE_FADE_PX = FEEL.edgeFadePx;
 /** Zwei-Finger-Drehen setzt erst ab diesem Winkel (rad) seit Pinch-Beginn ein. */
-export const TWIST_START = (8 * Math.PI) / 180;
+export const TWIST_START = (FEEL.twistStartDeg * Math.PI) / 180;
 
 export function chooseDrag(p: ScreenPoint, view: DragView, orbit: OrbitView | null): DragKind {
   if (!orbit) return 'look';
@@ -117,9 +118,9 @@ function edgeTurn(from: ScreenPoint, to: ScreenPoint, view: DragView, eps: numbe
   const rho = Math.hypot(sx, sy);
   const perPx = (2 * Math.tan(view.fovY / 2)) / Math.max(view.height, 1); // Bildebene je px
   const alpha = exactLimit(eps);
-  const fade = Math.exp(-Math.max(0, rho - Math.tan(alpha)) / perPx / EDGE_FADE_PX);
-  const base = orbitRate(view, eps);
-  const radial = base + (GRAB_EDGE * eps * Math.cos(alpha) ** 2 * perPx - base) * fade;
+  const fade = Math.exp(-Math.max(0, rho - Math.tan(alpha)) / perPx / FEEL.edgeFadePx);
+  const base = perPx * eps;
+  const radial = base + (FEEL.grabEdge * eps * Math.cos(alpha) ** 2 * perPx - base) * fade;
   const across = base + ((Math.sin(surfaceAngle(alpha, eps)) / Math.tan(alpha)) * perPx - base) * fade;
   const c = rho > 0 ? (dx * sx - dy * sy) / (len * rho) : 0; // cos(Zug, radial); Bild-y zeigt nach unten
   const k = Math.sqrt(radial * radial * c * c + across * across * Math.max(0, 1 - c * c));
@@ -155,10 +156,13 @@ export interface Twist {
   angle: number;
   total: number;
   engaged: boolean;
+  initialDist: number;
+  locked: boolean;
 }
 
 export function beginTwist(a: ScreenPoint, b: ScreenPoint): Twist {
-  return { angle: Math.atan2(b.y - a.y, b.x - a.x), total: 0, engaged: false };
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  return { angle: Math.atan2(b.y - a.y, b.x - a.x), total: 0, engaged: false, initialDist: dist, locked: false };
 }
 
 /**
@@ -168,13 +172,23 @@ export function beginTwist(a: ScreenPoint, b: ScreenPoint): Twist {
  * danach 1:1 in beide Richtungen.
  */
 export function twistTurn(t: Twist, a: ScreenPoint, b: ScreenPoint): { twist: Twist; turn: Vec3 } {
-  if (!(Math.hypot(b.x - a.x, b.y - a.y) > 0)) return { twist: t, turn: vec3() }; // keine Linie
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  if (!(dist > 0)) return { twist: t, turn: vec3() }; // keine Linie
   const angle = Math.atan2(b.y - a.y, b.x - a.x);
   const delta = Math.atan2(Math.sin(angle - t.angle), Math.cos(angle - t.angle)); // über ±π hinweg
   const total = t.total + delta;
-  const engaged = t.engaged || Math.abs(total) >= TWIST_START;
-  const z = t.engaged ? delta : engaged ? Math.sign(total) * (Math.abs(total) - TWIST_START) : 0;
-  return { twist: { angle, total, engaged }, turn: vec3(0, 0, z) };
+
+  const deltaR = Math.abs(dist - t.initialDist);
+  const twistStartRad = (FEEL.twistStartDeg * Math.PI) / 180;
+
+  const locked = t.locked || (!t.engaged && deltaR >= FEEL.pinchLockPx);
+
+  const rBar = (t.initialDist + dist) / 4;
+  const dominant = rBar * Math.abs(total) >= FEEL.twistDominance * deltaR;
+
+  const engaged = t.engaged || (!locked && Math.abs(total) >= twistStartRad && dominant);
+  const z = t.engaged ? delta : engaged ? Math.sign(total) * (Math.abs(total) - twistStartRad) : 0;
+  return { twist: { angle, total, engaged, initialDist: t.initialDist, locked }, turn: vec3(0, 0, z) };
 }
 
 /** Drehvektor im Kamerarahmen anhängen: q ⊗ exp(v). */
@@ -224,10 +238,10 @@ export function surfaceAngle(alpha: number, eps: number): number {
  * Strahlwinkel, bis zu dem der Griff exakt ist: dort ist dθ/dα = GRAB_EDGE · ε. Näher am Rand
  * würde der exakte Griff beliebig empfindlich — am Horizont unendlich viele Grad je Pixel.
  * Aus dθ/dα = k cos α / √(1 − k² sin² α) − 1 nach sin² α aufgelöst; ε kürzt sich heraus,
- * deshalb auch am Boden (ε → 0) wohldefiniert: dort sind es 60°, mehr als der Bildschirm zeigt.
+ * deshalb auch am Boden (ε → 0) wohldefiniert: dort are it 60°, mehr als der Bildschirm zeigt.
  */
 export function exactLimit(eps: number): number {
-  const e = GRAB_EDGE;
+  const e = FEEL.grabEdge;
   const k = 1 + eps;
   const sin2 = ((e - 1) * ((e + 1) * eps + 2)) / (k * k * e * (e * eps + 2));
   return Math.asin(Math.sqrt(sin2));
