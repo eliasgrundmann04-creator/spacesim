@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.12 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.13 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,7 +24,7 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.9)
+## 2. Aktueller Stand (v0.4.13)
 
 Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 163 Offline-Tests (7 Frame-Baum, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
@@ -36,7 +36,7 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Cube-Sphere-LOD-Quadtree bis Level 14 (~50 m Vertexabstand), asynchron über Worker-Pool; optionaler WGSL-Compute-Pfad via TSL (`?terrain=gpu`) mit Selbsttest und Fallback
 - Kachel-Pipeline mit Wachhund: unbeantwortete Worker-Jobs werden erkannt und einmal neu gestellt, nach sechs Verlusten dauerhafter Wechsel auf den synchronen Pfad; Prioritäten werden jedes Frame nachgeführt
 - **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kamera-Freiflug wird über die Positionsdifferenz/Verschiebung des Ankerkörpers mitgeführt (nicht über v · dt). Der Kern liegt isoliert und three-frei in `src/nav/`. Gleit-Modus (`?feel=glide:1`): Pinch steuert Schub und Bremsen mit Bremsraste und framerate-unabhängigem Abklingen; die Flugrichtung folgt dem Blick verzögert. Automatisches Tempo (v0.4.11): Kontaktzeit-Begrenzer drosselt die Anflugsgeschwindigkeit sanft vor dem Aufprall (`ttcMin = 0,6 s`); Stufen-Rückführung führt die wählbare Geschwindigkeitsstufe beim Entfernen vom Ort des Setzens einseitig auf ×1 zurück (`stageHalfDecades = 1`). Beide Funktionen sind per `?feel=autoPace:0` abschaltbar.
-- Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, über den Planetenrand hinaus läuft die Umrundung stetig weiter; im Freiflug dreht das Bild nie um seine Mitte — außer beim Zwei-Finger-Drehen (ab 20°, mit Pinch-Sperre und Dominanzprüfung, seit v0.4.8). Alle Gefühlswerte liegen isoliert in `nav/feel.ts` und sind live per URL (`?feel=...`) überschreibbar. Seit v0.4.6 ist `SpaceCamera.ts` unter den Dateideckel geteilt (`cameraTouch.ts` three-frei, `cameraPlacement.ts`)
+- Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, über den Planetenrand hinaus läuft die Umrundung stetig weiter; im Freiflug dreht das Bild nie um seine Mitte — außer beim Zwei-Finger-Drehen (ab 20°, mit Pinch-Sperre und Dominanzprüfung, seit v0.4.8). Alle Gefühlswerte liegen isoliert in `nav/feel.ts` und sind live per URL (`?feel=...`) überschreibbar. Seit v0.4.6 ist `SpaceCamera.ts` unter den Dateideckel geteilt (`cameraTouch.ts` three-frei, `cameraPlacement.ts`). Seit v0.4.13 ist `Engine.ts` unter den Dateideckel geteilt (`EngineHud.ts`, `EngineInput.ts`).
 - Adaptive Renderauflösung (0,7×–2×)
 - Laufzeit-Selbsttest in `Engine`: warnt, wenn die Kamera ohne Schub von ihrem Anker wegdriftet — diagnostiziert Verwechslungen von `dtReal` und `dtSim`
 - Agent-Betrieb: `AGENTS.md`, CI auf jedem PR, Vertragskarte mit Invarianten-Prüfung, Aufgabenwarteschlange in `docs/aufgaben/` (§8, §12)
@@ -320,6 +320,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.10 | Aufgabe 11: Tuning-Panel (`?tune`). Live-Abstimmung aller Gefühlswerte im Flug per Regler ohne Neuladen; automatische Adresszeilen-Nachführung, Kopierknopf und Standard-Reset. Reine Funktionen in `nav/feel.ts`, UI-Panel in `src/ui/TuningPanel.ts`. 5 Offline-Tests in `tools/test-feel.ts`. |
 | v0.4.11 | Aufgabe 12: Automatisches Tempo. Kontaktzeit-Begrenzer (`contactCap`, `softCap`) zur weichen Drosselung beim Anflug, direkte Annäherungskappung nach Relaxation; Stufen-Rückführung (`relaxStage`) im freien Flug mit einseitiger Rückführung auf ×1 bei Positionsveränderung. Isolierte Kernfunktionen in `src/nav/autoPace.ts`. 16 Offline-Tests in `tools/test-pace.ts`. |
 | v0.4.12 | Aufgabe 13: Warp-Mitführung über Verschiebung. Mitführung im Freiflug von v · dt auf die exakte Positionsdifferenz des Ankers umgestellt (`src/nav/frameCarry.ts`, `Navigator.ts`). Orbit-Freiflug-Kontinuität über `updatePlacement(0)` in `SpaceCamera.enterFreeFlight()` und `resetMotion` abgesichert. 25 Offline-Tests in `tools/test-warp.ts`. |
+| v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
 
 ---
 
