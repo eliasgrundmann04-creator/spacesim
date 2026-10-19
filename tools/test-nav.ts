@@ -10,6 +10,7 @@ import { DEFAULT_FLIGHT, stepFlight } from '../src/nav/flightKernel';
 import { DEFAULT_GOTO, advanceGoto, planGoto, sampleGoto, smootherstep } from '../src/nav/gotoKernel';
 import { pickBody, screenRay, tapTolerance } from '../src/nav/picking';
 import { Navigator } from '../src/nav/Navigator';
+import { FEEL } from '../src/nav/feel';
 
 // — Mini-Harness ————————————————————————————————————————————————
 
@@ -191,6 +192,7 @@ section('3. Flugmodell');
   // Was er garantiert, ist *Auflösung*: pro Frame ändert sich der Abstand zum Anker um
   // höchstens maxStepFraction·maxSubsteps. Es gibt also keinen Frame, der von weit
   // außerhalb mitten in den Körper führt — auch nicht bei dt = 0,25 s und ×100.
+  FEEL.autoPace = 0;
   let pos = add(earth.position, vec3(0, 0, R_EARTH + 1e9));
   let vel = vec3();
   let worstClose = 0;
@@ -211,6 +213,7 @@ section('3. Flugmodell');
   }
   check('Annäherung pro Frame bleibt beschränkt', worstClose <= frameCap * 1.05 && !jumped,
     `max ${(worstClose * 100).toFixed(1)} % pro Frame, Deckel ${(frameCap * 100).toFixed(0)} %`);
+  FEEL.autoPace = 1;
 
   // Unterhalb von minAltitude bleibt eine Restsinkrate — die muss die Kollisionsprüfung
   // abfangen. Der Kern garantiert nur, dass sie klein und beschränkt ist.
@@ -279,6 +282,7 @@ section('3. Flugmodell');
     let a: BodyRef = { id: 'a', position: vec3(0, 0, 0), radius: 1e6, velocity: vec3(0, 0, 0) };
     let b: BodyRef = { id: 'b', position: vec3(4e7, 0, 0), radius: 1e6, velocity: vec3(0, 1022 * warp, 0) };
     let p = vec3(2e6, 0, 0);
+    FEEL.autoPace = 0;
     const inp: NavInput = { ...neutralInput(), forward: 1, speedScale: 30 };
     let maxRel = 0;
     for (let i = 0; i < 600; i++) {
@@ -291,6 +295,7 @@ section('3. Flugmodell');
     const near = Math.min(distance(p, a.position) - a.radius, distance(p, b.position) - b.radius);
     check('Ankerwechsel schleudert nicht weg', Number.isFinite(near) && near < 1e9,
       `Endhöhe ${near.toExponential(2)} m, max v_rel ${maxRel.toExponential(2)} m/s`);
+    FEEL.autoPace = 1;
   }
 }
 
@@ -433,6 +438,7 @@ section('6. Szenario: von der Erdoberfläche zum Mond, nur mit Schub');
   let pos = add(bodies[1].position, scale(toMoon, R_EARTH + 2));
 
   const dt = 1 / 60;
+  FEEL.autoPace = 0;
   const input: NavInput = { ...neutralInput(), forward: 1, speedScale: 10 };
   let t = 0;
   let minEarthAlt = Infinity;
@@ -453,6 +459,7 @@ section('6. Szenario: von der Erdoberfläche zum Mond, nur mit Schub');
     `${arrived.toFixed(1)} s`);
   check('Erde wird dabei nicht durchflogen', minEarthAlt > 0,
     `min. Erdhöhe ${minEarthAlt.toFixed(1)} m`);
+  FEEL.autoPace = 1;
 
   // Symmetrie: dieselbe Strecke rückwärts muss gleich lang dauern. Das ist die eigentliche
   // Aussage des Modells — die Flugzeit hängt nur vom Höhenverhältnis ab, nicht von der

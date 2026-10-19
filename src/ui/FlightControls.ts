@@ -46,6 +46,7 @@ export class FlightControls {
   private lastTapTime = 0;
   private lastTapX = 0;
   private lastTapY = 0;
+  private lastDisplayedScale = 1;
   private disposers: Array<() => void> = [];
 
   constructor(options: FlightControlsOptions) {
@@ -100,6 +101,9 @@ export class FlightControls {
   /** Einmal pro Frame *nach* dem Lesen aufrufen: setzt Einmal-Flags zurück. */
   endFrame(): void {
     this.input.brake = false;
+    if (this.input.speedScale !== this.lastDisplayedScale) {
+      this.refreshLabels();
+    }
   }
 
   setHud(text: string): void {
@@ -202,6 +206,7 @@ export class FlightControls {
   private refreshLabels(): void {
     this.scaleLabel.textContent = formatScale(this.input.speedScale);
     this.assistBtn.classList.toggle('nav-btn-on', this.input.assist);
+    this.lastDisplayedScale = this.input.speedScale;
   }
 
   // — Doppeltipp ——————————————————————————————————————————————

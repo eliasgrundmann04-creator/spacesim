@@ -1,7 +1,7 @@
 ---
 id: 12
 titel: Automatisches Tempo — Anflug nach Kontaktzeit, Stufe läuft zur Umgebung zurück
-status: offen
+status: erledigt
 braucht: [11]
 stufe: —
 tablet: ja

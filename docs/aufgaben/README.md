@@ -46,6 +46,7 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 09 | Kamera-Gefühl: Nachlauf, Drehschwelle, gleichmäßiger Orbit, `?feel=` | 08 | ja |
 | 10 | Gleitflug — Pinch ist Schub, die Bewegung gleitet weiter | 09 | ja |
 | 11 | Tuning-Panel — Gefühlswerte live mit Reglern abstimmen | 10 | ja |
+| 12 | Automatisches Tempo — Anflug nach Kontaktzeit, Stufe läuft zur Umgebung zurück | 11 | ja |
 
 **Eine nach der anderen.** 01–04 hängen nicht voneinander ab, aber parallele PRs kollidieren in
 `package.json` (Version), `docs/contracts.md` und Leitfaden §2/§11. Für ein Einpersonenprojekt kostet

@@ -3,6 +3,8 @@ import { addScaled, length, relaxFactor, scale, vec3 } from './vec';
 import type { BodyRef, NavInput } from './types';
 import type { Proximity, ProximityConfig } from './proximity';
 import { DEFAULT_PROXIMITY, evaluateProximity } from './proximity';
+import { contactCap, softCap } from './autoPace';
+import { FEEL } from './feel';
 
 /**
  * Skalenfreier Flug: v = rate · Referenzhöhe · speedScale.
@@ -142,7 +144,12 @@ export function stepFlight(
     let target: Vec3;
     let tau: number;
     if (thrusting) {
-      target = { x: cx * referenceSpeed, y: cy * referenceSpeed, z: cz * referenceSpeed };
+      let targetSpeed = referenceSpeed;
+      if (FEEL.autoPace >= 0.5) {
+        const vCap = contactCap(p, { x: cx, y: cy, z: cz }, bodies, FEEL.ttcMin);
+        targetSpeed = softCap(referenceSpeed, vCap);
+      }
+      target = { x: cx * targetSpeed, y: cy * targetSpeed, z: cz * targetSpeed };
       tau = cfg.accelTau;
     } else if (input.assist) {
       target = vec3();
@@ -165,6 +172,31 @@ export function stepFlight(
       y: v.y + (target.y - v.y) * a,
       z: v.z + (target.z - v.z) * a,
     };
+
+    if (FEEL.autoPace >= 0.5 && (thrusting || input.assist) && FEEL.ttcMin > 0) {
+      for (const body of bodies) {
+        const dx = body.position.x - p.x;
+        const dy = body.position.y - p.y;
+        const dz = body.position.z - p.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const alt = dist - body.radius;
+        if (alt > 0 && dist > 1e-12) {
+          const rx = dx / dist;
+          const ry = dy / dist;
+          const rz = dz / dist;
+          const ci = v.x * rx + v.y * ry + v.z * rz;
+          const limit = alt / FEEL.ttcMin;
+          if (ci > limit) {
+            const diff = ci - limit;
+            v = {
+              x: v.x - diff * rx,
+              y: v.y - diff * ry,
+              z: v.z - diff * rz,
+            };
+          }
+        }
+      }
+    }
 
     if (cfg.maxSpeed < Infinity) {
       const sp = length(v);
