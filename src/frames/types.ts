@@ -16,4 +16,6 @@ export interface FrameNode {
   readonly children: FrameNode[];
   /** Position des Frame-Ursprungs im Koordinatensystem des Eltern-Frames (Meter). */
   position: Vec3;
+  /** Sphere of Influence Radius (Meter). Default: Infinity */
+  soiRadius?: number;
 }

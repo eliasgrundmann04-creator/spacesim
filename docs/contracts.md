@@ -8,13 +8,13 @@
 
 | Datei | three | Kern | Deckel | hängt ab von |
 |---|---|---|---|---|
-| `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
+| `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, frames/FrameTree, frames/types, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
 | `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
 | `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
 | `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
 | `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
-| `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
+| `core/SceneManager.ts` | direkt |  |  | frames/FrameTree, frames/types, math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
 | `core/constants.ts` | — |  |  |  |
 | `frames/FrameTree.ts` | — | ✓ |  | frames/types, nav/vec |
@@ -46,7 +46,7 @@
 | `terrain/tileGeometry.ts` | — | ✓ | ⚠ | terrain/noise |
 | `ui/FlightControls.ts` | — |  |  | nav/format, nav/types |
 | `ui/TuningPanel.ts` | — |  |  | nav/feel |
-| `universe/CelestialBody.ts` | direkt |  |  | core/constants, math/Vector3d, physics/Kepler |
+| `universe/CelestialBody.ts` | direkt |  |  | core/constants, frames/types, math/Vector3d, physics/Kepler |
 | `universe/Planet.ts` | direkt |  |  | math/Vector3d, terrain/PlanetLOD, terrain/noise, terrain/tileGeometry, universe/CelestialBody |
 | `universe/Star.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `universe/UniverseManager.ts` | über math/Vector3d |  |  | core/SceneManager, core/constants, data/catalog.json, math/Vector3d, math/rng, physics/Kepler, terrain/tileGeometry, universe/CelestialBody, universe/Planet, universe/Star, universe/procedural |
@@ -58,8 +58,9 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
+- `npm run test:camera-frame` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-camera-frame.ts`
 - `npm run test:warp` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts`
 - `npm run test:pace` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-pace.ts`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
@@ -82,7 +83,8 @@
   - `readonly worldPosition: Vector3d`
   - `target: CelestialBody | null`
   - `mode: CameraMode`
-  - `constructor(private readonly dom: HTMLElement)`
+  - `frame: FrameNode | null`
+  - `constructor(dom: HTMLElement)`
   - `navInput(base: NavInput, dt: number): NavInput`
   - `focus(body: CelestialBody): void`
   - `enterOrbit(body: CelestialBody): void`
@@ -90,6 +92,8 @@
   - `lookTowards(point: Vec3, dt: number, tau = 0.45): void`
   - `zoomStep(direction: 1 | -1): void`
   - `setWorldPosition(v: Vec3): void`
+  - `setFrame(frame: FrameNode): void`
+  - `updateFrame(): void`
   - `setFreeAltitude(altitude: number): void`
   - `basis(): { forward: Vec3; right: Vec3; up: Vec3 }`
   - `clampToSurface(body: CelestialBody): Vec3 | null`
@@ -114,7 +118,7 @@
 - `class CameraTouchInput`
   - `readonly fling: Fling`
   - `readonly glide: Glide`
-  - `constructor(private readonly dom: HTMLElement, private readonly callbacks: CameraTouchCallbacks)`
+  - `constructor(dom: HTMLElement, callbacks: CameraTouchCallbacks)`
 
 ### `core/Engine.ts`
 
@@ -157,7 +161,7 @@
   - `addSystem(root: CelestialBody): void`
   - `removeBody(body: CelestialBody): void`
   - `get allBodies(): readonly CelestialBody[]`
-  - `syncToCamera(cameraWorldPos: Vector3d, dt: number): void`
+  - `syncToCamera(cameraWorldPos: Vector3d, dt: number, cameraFrame?: FrameNode | null): void`
 
 ### `core/SimClock.ts`
 
@@ -193,14 +197,16 @@
 
 ### `frames/FrameTree.ts`
 
-- `function createFrame(id: string, name: string, position: Vec3 = ZERO): FrameNode`
+- `function createFrame(id: string, name: string, position: Vec3 = ZERO, soiRadius = Infinity): FrameNode`
+- `function computeSoiRadius(a: number, mass: number, parentMass: number): number`
+- `function updateActiveFrame(p: Vec3, currentFrame: FrameNode): { frame: FrameNode; position: Vec3 }`
 - `function attachFrame(child: FrameNode, parent: FrameNode | null): void`
 - `function findLCA(a: FrameNode, b: FrameNode): { lca: FrameNode; pathToLCAFromA: FrameNode[]; pathToLCAFromB: FrameNode[]; }`
 - `function transformPoint(p: Vec3, from: FrameNode, to: FrameNode): Vec3`
 
 ### `frames/types.ts`
 
-- `interface FrameNode { id, name, parent, children, position }`
+- `interface FrameNode { id, name, parent, children, position, soiRadius? }`
 
 ### `math/Vector3d.ts`
 
@@ -552,6 +558,7 @@
   - `parent: CelestialBody | null`
   - `readonly children: CelestialBody[]`
   - `orbit: Orbit | null`
+  - `frame: FrameNode | null`
   - `readonly position: Vector3d`
   - `readonly velocity: Vector3d`
   - `readonly root: THREE.Group`

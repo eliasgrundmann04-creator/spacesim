@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.13 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.15 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,9 +24,9 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.13)
+## 2. Aktueller Stand (v0.4.15)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 163 Offline-Tests (7 Frame-Baum, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 175 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
@@ -357,6 +357,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.12 | Aufgabe 13: Warp-Mitführung über Verschiebung. Mitführung im Freiflug von v · dt auf die exakte Positionsdifferenz des Ankers umgestellt (`src/nav/frameCarry.ts`, `Navigator.ts`). Orbit-Freiflug-Kontinuität über `updatePlacement(0)` in `SpaceCamera.enterFreeFlight()` und `resetMotion` abgesichert. 25 Offline-Tests in `tools/test-warp.ts`. |
 | v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
 | v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Nachtrag: Entscheidung für Option B (hierarchisch nach SOI) am 19.10.2026 eingetragen. |
+| v0.4.15 | Stufe 2b (Aufgabe 05): Kamera hängt in Bezugsrahmen um (`SpaceCamera`, `SceneManager`). `updateActiveFrame` mit SOI-Radius und 15 % Hysterese in `src/frames/FrameTree.ts`. HUD-Anzeige des Kameraframes. 12 Offline-Tests in `tools/test-camera-frame.ts`. |
 
 ---
 

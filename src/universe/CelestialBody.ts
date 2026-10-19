@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { Vector3d } from '../math/Vector3d';
 import { G } from '../core/constants';
 import type { Orbit } from '../physics/Kepler';
+import type { FrameNode } from '../frames/types';
 
 export type BodyType = 'star' | 'rocky' | 'gas';
 
@@ -36,6 +37,7 @@ export abstract class CelestialBody {
   parent: CelestialBody | null = null;
   readonly children: CelestialBody[] = [];
   orbit: Orbit | null = null;
+  frame: FrameNode | null = null;
 
   /** Absolute Weltposition in Metern (f64). Wird von updateHierarchy gesetzt. */
   readonly position = new Vector3d();

@@ -30,6 +30,7 @@ export class EngineHud {
 
     const n = ctx.nav;
     const label = n?.anchor?.name ?? ctx.camera.target?.name ?? '—';
+    const frameLabel = ctx.camera.frame ? ` [Frame: ${ctx.camera.frame.name}]` : '';
     const speed = n ? `   v ${formatSpeed(n.relativeSpeed)}` : '';
     const modeLabel = !n
       ? 'ORBIT'
@@ -38,7 +39,7 @@ export class EngineHud {
         : `FLUG ${formatScale(ctx.flightControls.input.speedScale)}`;
 
     this.hud.textContent =
-      `${label}   Höhe ${formatDistance(ctx.camera.altitude)}${speed}\n` +
+      `${label}${frameLabel}   Höhe ${formatDistance(ctx.camera.altitude)}${speed}\n` +
       `${modeLabel}   Warp ${warpLabel}   ${date} UTC\n` +
       `${fps} fps @ ${ctx.renderScale.toFixed(2)}×   ` +
       `Terrain ${ctx.terrain.backend}${workers}   Queue ${ctx.terrain.pending}   ` +

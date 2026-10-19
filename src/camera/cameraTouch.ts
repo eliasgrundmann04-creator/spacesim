@@ -27,7 +27,7 @@ export class CameraTouchInput {
   readonly glide = new Glide();
 
   private dragKind: DragKind = 'look';
-  private canvasRect = new DOMRect();
+  private canvasRect = typeof DOMRect !== 'undefined' ? new DOMRect() : ({ left: 0, top: 0, width: 0, height: 0 } as DOMRect);
 
   private readonly pointers = new Map<number, PointerState>();
   private pinchDistance = 0;
@@ -35,10 +35,15 @@ export class CameraTouchInput {
   private pinchY = 0;
   private twist: Twist = beginTwist({ x: 0, y: 0 }, { x: 1, y: 0 });
 
+  private readonly dom: HTMLElement;
+  private readonly callbacks: CameraTouchCallbacks;
+
   constructor(
-    private readonly dom: HTMLElement,
-    private readonly callbacks: CameraTouchCallbacks,
+    dom: HTMLElement,
+    callbacks: CameraTouchCallbacks,
   ) {
+    this.dom = dom;
+    this.callbacks = callbacks;
     dom.style.touchAction = 'none';
     this.bindPointer();
   }
@@ -81,12 +86,14 @@ export class CameraTouchInput {
     };
     dom.addEventListener('pointerup', release);
     dom.addEventListener('pointercancel', release);
-    window.addEventListener('blur', () => {
-      this.pointers.clear();
-      this.pinchDistance = 0;
-      this.fling.stop();
-      this.glide.end();
-    });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blur', () => {
+        this.pointers.clear();
+        this.pinchDistance = 0;
+        this.fling.stop();
+        this.glide.end();
+      });
+    }
 
     dom.addEventListener('wheel', (e) => {
       e.preventDefault();
