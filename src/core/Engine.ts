@@ -192,7 +192,7 @@ export class Engine {
     // dahin starr am Ziel montiert, die Relativgeschwindigkeit ist also null.
     if (this.camera.mode === 'orbit' && Math.abs(input.forward) > THRUST_EPSILON) {
       this.camera.enterFreeFlight();
-      this.navigator.setRelativeVelocity({ x: 0, y: 0, z: 0 });
+      this.navigator.resetMotion(this.camera.target && this.bodyRef(this.camera.target));
     }
 
     if (this.camera.mode !== 'free') {
@@ -358,7 +358,7 @@ export class Engine {
     // Aus dem Orbit heraus ist die Relativgeschwindigkeit per Definition null — die
     // Kamera hing starr am Ziel. Ohne dieses Zurücksetzen übernähme ein abgebrochener
     // Anflug die Geschwindigkeit einer längst beendeten Flugphase.
-    if (this.camera.mode === 'orbit') this.navigator.setRelativeVelocity({ x: 0, y: 0, z: 0 });
+    if (this.camera.mode === 'orbit') this.navigator.resetMotion(this.camera.target && this.bodyRef(this.camera.target));
     this.camera.enterFreeFlight();
     this.navigator.requestGoto(toVec(this.camera.worldPosition), this.bodyRef(body));
     this.gotoUid = body.uid;

@@ -1,5 +1,5 @@
 import type { Vec3 } from './vec';
-import { add, copy, length, relaxFactor, scale, sub, vec3 } from './vec';
+import { add, copy, length, scale, sub, vec3 } from './vec';
 import type { BodyRef, NavFrame, NavInput } from './types';
 import { THRUST_EPSILON } from './types';
 import type { FlightConfig } from './flightKernel';
@@ -10,6 +10,8 @@ import { evaluateProximity } from './proximity';
 import type { AutoPaceState } from './autoPace';
 import { createAutoPaceState, relaxStage } from './autoPace';
 import { FEEL } from './feel';
+import type { FrameCarryState } from './frameCarry';
+import { applyFrameCarry, createFrameCarryState, trackFrameVelocity, updateCarry } from './frameCarry';
 
 export type NavMode = 'free' | 'goto';
 
@@ -59,9 +61,7 @@ export class Navigator {
   private relVelocity: Vec3 = vec3();
   private mode: NavMode = 'free';
   private plan: GotoPlan | null = null;
-  private frameVelocity: Vec3 = vec3();
-  private lastAnchorId: string | null = null;
-  private lastAnchorPos: Vec3 | null = null;
+  private carryState: FrameCarryState = createFrameCarryState();
   private lastTargetPos: Vec3 | null = null;
   private lastReferenceSpeed = 0;
 
@@ -78,7 +78,7 @@ export class Navigator {
   }
 
   getFrameVelocity(): Vec3 {
-    return copy(this.frameVelocity);
+    return copy(this.carryState.frameVelocity);
   }
 
   private paceState: AutoPaceState = createAutoPaceState();
@@ -89,6 +89,14 @@ export class Navigator {
    */
   setRelativeVelocity(v: Vec3): void {
     this.relVelocity = copy(v);
+  }
+
+  /** Relativgeschwindigkeit zurücksetzen und Merkpunkt setzen beim Verlassen des Orbits. */
+  resetMotion(anchor: BodyRef | null): void {
+    this.relVelocity = vec3();
+    this.carryState.lastAnchorId = anchor ? anchor.id : null;
+    this.carryState.lastAnchorPos = anchor ? copy(anchor.position) : null;
+    updateCarry(this.carryState, anchor);
   }
 
   /** Startet einen Übergang. `preferredDir` erlaubt z. B. einen Anflug von der Sonnenseite. */
@@ -135,8 +143,18 @@ export class Navigator {
     input: NavInput,
     dt: number,
   ): NavResult {
-    const pre = evaluateProximity(frame.position, bodies, this.cfg.flight);
-    this.trackFrameVelocity(pre.anchor, dt);
+    const carryRes = applyFrameCarry(frame.position, this.carryState, bodies);
+    const startPos = carryRes.start;
+
+    const pre = evaluateProximity(startPos, bodies, this.cfg.flight);
+    this.relVelocity = trackFrameVelocity(
+      this.carryState,
+      pre.anchor,
+      dt,
+      this.cfg.frameVelocityTau,
+      this.lastReferenceSpeed,
+      this.relVelocity,
+    );
 
     if (FEEL.autoPace >= 0.5) {
       input.speedScale = relaxStage(
@@ -149,27 +167,35 @@ export class Navigator {
 
     if (input.brake) this.relVelocity = vec3();
 
+    const frameVelForKernel = carryRes.carried ? vec3() : this.carryState.frameVelocity;
+
     const step = stepFlight(
-      frame.position,
+      startPos,
       this.relVelocity,
       frame,
       input,
       bodies,
-      this.frameVelocity,
+      frameVelForKernel,
       dt,
       this.cfg.flight,
     );
     this.relVelocity = step.relVelocity;
     this.lastReferenceSpeed = step.referenceSpeed;
 
+    updateCarry(this.carryState, step.proximity.anchor);
+
+    const worldVel = carryRes.carried
+      ? add(step.relVelocity, this.carryState.frameVelocity)
+      : step.worldVelocity;
+
     return {
       position: step.position,
-      velocity: step.worldVelocity,
+      velocity: worldVel,
       relVelocity: copy(step.relVelocity),
       mode: 'free',
       anchor: step.proximity.anchor,
       altitude: step.proximity.altitude,
-      speed: step.speed,
+      speed: length(worldVel),
       relativeSpeed: step.relativeSpeed,
       lookAt: null,
       gotoTarget: null,
@@ -187,7 +213,14 @@ export class Navigator {
 
     const position = sampleGoto(plan, target.position);
     const prox = evaluateProximity(position, bodies, this.cfg.flight);
-    this.trackFrameVelocity(prox.anchor, dt);
+    this.relVelocity = trackFrameVelocity(
+      this.carryState,
+      prox.anchor,
+      dt,
+      this.cfg.frameVelocityTau,
+      this.lastReferenceSpeed,
+      this.relVelocity,
+    );
 
     // Übergabegeschwindigkeit: analytischer Anteil relativ zum Ziel plus die Eigenbewegung
     // des Ziels. Bei τ = 1 verschwindet der analytische Teil exakt (ṡ = 0), es bleibt genau
@@ -195,8 +228,10 @@ export class Navigator {
     const approach = sampleGotoVelocity(plan);
     const targetVel = this.targetVelocity(target, used);
     const world = add(approach, targetVel);
-    this.relVelocity = sub(world, this.frameVelocity);
+    this.relVelocity = sub(world, this.carryState.frameVelocity);
     this.lastTargetPos = copy(target.position);
+
+    updateCarry(this.carryState, prox.anchor);
 
     const done = gotoFinished(plan);
     const progress = gotoProgress(plan);
@@ -227,64 +262,6 @@ export class Navigator {
     if (this.lastTargetPos && dt > 0) return scale(sub(target.position, this.lastTargetPos), 1 / dt);
     return vec3();
   }
-
-  // — Rahmengeschwindigkeit ————————————————————————————————————
-
-  /**
-   * Geschwindigkeit des Ankerkörpers in m pro **Realsekunde**. Bevorzugt der gelieferte
-   * Wert, sonst die Differenz zweier Frames. Der Tiefpass fängt die Sprünge ab, die beim
-   * Umschalten des Time-Warps entstehen.
-   *
-   * Beim **Ankerwechsel** springt die Rahmengeschwindigkeit. Physikalisch müsste die
-   * Weltgeschwindigkeit stetig bleiben (Trägheit), die Relativgeschwindigkeit also um die
-   * Differenz springen. Bei hohem Time-Warp ist diese Differenz aber die Bahngeschwindigkeit
-   * mal Warpfaktor — man würde beim Wechsel Erde→Mond weggeschleudert. Übernommen wird
-   * deshalb nur der Anteil, der die eigene Bewegungsskala nicht sprengt: bei realistischem
-   * Tempo bleibt die Trägheit erhalten, bei Warp gewinnt die Mitführung.
-   * Die saubere Auflösung ist der Frame-Baum aus §3.1 (Stufe 2).
-   */
-  private trackFrameVelocity(anchor: BodyRef | null, dt: number): void {
-    const previous = this.frameVelocity;
-    const switched = anchor ? this.lastAnchorId !== null && this.lastAnchorId !== anchor.id : false;
-
-    if (!anchor) {
-      this.frameVelocity = vec3();
-      this.lastAnchorId = null;
-      this.lastAnchorPos = null;
-      return;
-    }
-
-    if (anchor.velocity) {
-      this.frameVelocity = copy(anchor.velocity);
-    } else if (this.lastAnchorId === anchor.id && this.lastAnchorPos && dt > 0) {
-      const measured = scale(sub(anchor.position, this.lastAnchorPos), 1 / dt);
-      const a = relaxFactor(dt, this.cfg.frameVelocityTau);
-      this.frameVelocity = {
-        x: this.frameVelocity.x + (measured.x - this.frameVelocity.x) * a,
-        y: this.frameVelocity.y + (measured.y - this.frameVelocity.y) * a,
-        z: this.frameVelocity.z + (measured.z - this.frameVelocity.z) * a,
-      };
-    } else {
-      this.frameVelocity = vec3();
-    }
-
-    if (switched) {
-      const carry = clampMagnitude(
-        sub(previous, this.frameVelocity),
-        Math.max(this.lastReferenceSpeed, length(this.relVelocity)),
-      );
-      this.relVelocity = add(this.relVelocity, carry);
-    }
-
-    this.lastAnchorId = anchor.id;
-    this.lastAnchorPos = copy(anchor.position);
-  }
-}
-
-function clampMagnitude(v: Vec3, max: number): Vec3 {
-  const l = length(v);
-  if (!(max > 0) || l <= max) return l > 0 ? copy(v) : vec3();
-  return scale(v, max / l);
 }
 
 function findBody(bodies: readonly BodyRef[], id: string): BodyRef | null {

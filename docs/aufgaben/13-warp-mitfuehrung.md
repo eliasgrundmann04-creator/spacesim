@@ -1,7 +1,7 @@
 ---
 id: 13
 titel: Fix — Kamera bleibt bei Zeitraffer über dem Anker (Mitführung über die Verschiebung)
-status: offen
+status: erledigt
 braucht: [12]
 stufe: — (Fehler aus Stufe 1)
 tablet: ja
