@@ -262,7 +262,42 @@ Neue Rechenkerne so schneiden, dass sie in Node testbar sind — das ist der Gru
 
 Zu entscheiden, wenn die jeweilige Stufe ansteht:
 
-- **Frame-Wechsel-Schwellen** (Stufe 2): distanzbasiert, hierarchisch nach SOI, oder nach Winkelgröße? → Entscheidungsvorlage ist Aufgabe 04.
+- **Frame-Wechsel-Schwellen** (Stufe 2): distanzbasiert, hierarchisch nach SOI, oder nach Winkelgröße?
+
+  *(Entscheidungsvorlage aus Aufgabe 04 — Stand v0.4.14; Entscheidungsstatus im PR: offen)*
+
+  ### Option A: Distanzbasiert (Feste Radien-Vielfache)
+  - **Regel:** Wechsel in den Frame eines Körpers, wenn der Abstand $d \le k \cdot R$ (z. B. $k = 100 \cdot R$) unterschreitet; Stern-System-Wechsel bei festem Lichtjahr-Radius.
+  - **Was sie gut kann:** Extrem einfache Berechnung, intuitiv verständlich, triviale Unit-Tests ohne Gravitationsparameter.
+  - **Wo sie bricht:**
+    - *Mond-Vorbeiflug:* Mond-Radius $R_{\text{Mond}} = 1.737\text{ km}$. Bei $k = 100$ läge die Schwelle bei $173.700\text{ km}$. Das ist fast das Dreifache der Mond-SOI ($66.000\text{ km}$) — die Kamera würde mitten im von der Erde dominierten Raumschacht in den Mond-Frame springen.
+    - *Time-Warp $\times 10^8$:* Starre Abstandsradien berücksichtigen keine Relativgeschwindigkeiten; bei hohen Warp-Faktoren wird die dünne Schale in einem einzelnen Frame übersprungen.
+    - *Anflug auf einen `PSC-*`-Stern:* Bei $k \cdot R_{\text{Sonne}}$ ($100 \cdot 696.340\text{ km} \approx 0,46\text{ AE}$) bliebe die Kamera im interstellaren Flug bis kurz vor die Korona im Galaxie-Frame — mit $1,05\text{ m}$ f64-Rauschen bei $1\text{ Lj}$ Distanz.
+    - *Flug aus der Galaxie hinaus:* Für körperlose Räume (Nebel, Galaxienhaufen) fehlen Radien als Bezugsgröße.
+  - **Folgen für die Navigation:** Ankerwechsel erfolgen rein geometrisch ohne Bezug zur Bahnmechanik. Ankerrelative Geschwindigkeit $v_{\text{rel}}$ erfährt künstliche Diskontinuitäten. Softmin-Referenzhöhe divergiert an den geometrischen Schwellen von der physikalischen Hauptmasse.
+  - **Hysterese:** Eintritt bei $d \le k \cdot R$, Austritt bei $d \ge 1,20 \cdot k \cdot R$ (20 % Bandbreite).
+
+  ### Option B: Hierarchisch nach SOI (Sphere of Influence) — EMPFEHLUNG
+  - **Regel:** Der aktive Frame folgt der astronomischen Gravitationshierarchie: Die Kamera wählt stets den tiefsten Knoten im Orbitbaum, dessen Gravitations-Einflussbereich $r_{\text{SOI}} = a \cdot (m/M)^{2/5}$ sie betritt; außerhalb planetarer SOIs gilt der Stern-Frame ($r_{\text{SOI, Stern}} \approx 1,03\text{ Lj}$), außerhalb der Stern-SOI der Galaxie-Frame.
+  - **Was sie gut kann:** Physikalisch exakte Entkopplung. Die Koordinatengrenzen entsprechen exakt den stärksten Beschleunigungsfeldern und der Kepler-Baumstruktur. f64-Auflösung ist in jeder Ebene optimal ($7,3\text{ nm}$ bei Mond-SOI, $103\text{ nm}$ bei Erde-SOI, $1,05\text{ m}$ im Sternsystem bei $1\text{ Lj}$, $2.100\text{ km}$ im Galaxie-Frame bei $2\text{ Mio. Lj}$).
+  - **Verhalten in den Szenarien:**
+    - *Mond-Vorbeiflug:* Eintritt erst bei $r \le 66.000\text{ km}$ (Mond-SOI). Davor Verbleib im Erde-Frame, wo die Mondbahn physikalisch exakt akkumuliert wird.
+    - *Time-Warp $\times 10^8$:* Verschachtelte SOIs bilden lückenlose physikalische Räume. Auch bei großen Zeitschritten landet die Kamera deterministisch im mathematisch korrekten Dominanzgebiet.
+    - *Anflug auf einen `PSC-*`-Stern:* Wechsel vom Galaxie-Frame in den Stern-Frame bei $r \le r_{\text{SOI, Stern}} \approx 1,03\text{ Lj}$ ($\approx 9,8 \times 10^{15}\text{ m}$). Das gesamte Planetary System liegt geschützt im Stern-Frame; f64-Rauschen fällt von $2.100\text{ km}$ (Galaxie) sofort auf $1,05\text{ m}$.
+    - *Flug aus der Galaxie hinaus:* Außerhalb der Stern-SOI ($> 1\text{ Lj}$) Galaxie-Frame; beim Verlassen des Milchstraßen-Systems ($\sim 100.000\text{ Lj}$) nahtloser Übergang in den Lokale-Gruppe- / Kosmos-Frame.
+  - **Folgen für die Navigation:** Ankerwechsel fällt exakt mit dem Wechsel des dominierenden Anziehungskörpers zusammen. Die ankerrelative Geschwindigkeit $v_{\text{rel}}$ wird beim Frame-Wechsel präzise um die analytische Kepler-Bahngeschwindigkeit $v_{\text{parent}}$ transformiert ($v_{\text{rel, neu}} = v_{\text{rel, alt}} - v_{\text{parent}}$). Die Softmin-Referenzhöhe gewichtet den Anker nativ als Primärkörper.
+  - **Hysterese:** Eintritt bei $r \le 1,00 \cdot r_{\text{SOI}}$, Austritt erst bei $r \ge 1,15 \cdot r_{\text{SOI}}$ (15 % Sicherheitsmarge gegen Oszillation an der Gravitationsgrenze).
+
+  ### Option C: Nach scheinbarer Winkelgröße (Screen/FOV-Budget)
+  - **Regel:** Wechsel in den Frame eines Körpers/Systems, sobald seine scheinbare Winkelgröße $\theta = 2 \cdot \arctan(R / d)$ am Bildschirm einen Schwellenwert überschreitet ($\theta_{\text{enter}} \ge 15^\circ$ für Körper, $\theta \ge 5^\circ$ für Systeme).
+  - **Was sie gut kann:** Garantiert visuelle Kopplung — das Koordinatensystem verankert sich stets am Objekt, das den Bildschirm dominiert und LOD-Details erfordert.
+  - **Wo sie bricht:**
+    - *Mond-Vorbeiflug:* Ein kleiner Mond hat bei $60.000\text{ km}$ Abstand nur $\theta \approx 0,33^\circ$. Ein Frame-Wechsel würde erst in $6.600\text{ km}$ Höhe stattfinden ($\theta = 15^\circ$), obwohl der Flug bereits tief im Schwerefeld verläuft.
+    - *Time-Warp $\times 10^8$:* Zoom- und FOV-Änderungen verändern $\theta$ unabhängig von der räumlichen Position; extremer Time-Warp führt zu kaskadierenden Frame-Jumps.
+    - *Anflug auf einen `PSC-*`-Stern:* Ein Stern in $0,5\text{ Lj}$ Entfernung ist ein punktförmiges Objekt ($\theta \ll 0,01^\circ$). Der Wechsel in den Stern-Frame würde erst wenige AE vor dem Stern erfolgen, wodurch der Anflug im galaktischen Rauschen verharrt.
+    - *Flug aus der Galaxie hinaus:* Diffuse Großstrukturen (Nebel, Voids) besitzen keine scharfe Winkelgrenze.
+  - **Folgen für die Navigation:** Unphysikalische Kopplung von Physik und Koordinatensystem an Render- und Kamera-Parameter (FOV, Bildschirmauflösung).
+  - **Hysterese:** Eintritt bei $\theta \ge 15^\circ$, Austritt bei $\theta \le 10^\circ$.
 - **Meter-Einheit je Frame** (Befund aus Stufe 2a / Aufgabe 01): IEEE-754 f64 ist Gleitkomma — die relative Auflösung hängt ausschließlich am Betrag der Koordinate, nicht an ihrer physikalischen Einheit. Ein Skalenfaktor pro Frame bringt zusätzliche Rundungsfehler, aber keine rechnerische Präzision. Alle Frames bleiben daher bei Metern (`m`).
 - **Katalogformat** (Stufe 4): JSON ist bei 10⁵ Sternen zu groß. Binärformat mit gepackten Feldern, gestreamt in Chunks?
 - **Nebeldaten** (Stufe 5): echte 3D-Daten existieren nicht — Rekonstruktion aus 2D-Bild plus geschätzter Distanz. Wie viel Handarbeit pro Objekt ist vertretbar?
@@ -321,6 +356,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.11 | Aufgabe 12: Automatisches Tempo. Kontaktzeit-Begrenzer (`contactCap`, `softCap`) zur weichen Drosselung beim Anflug, direkte Annäherungskappung nach Relaxation; Stufen-Rückführung (`relaxStage`) im freien Flug mit einseitiger Rückführung auf ×1 bei Positionsveränderung. Isolierte Kernfunktionen in `src/nav/autoPace.ts`. 16 Offline-Tests in `tools/test-pace.ts`. |
 | v0.4.12 | Aufgabe 13: Warp-Mitführung über Verschiebung. Mitführung im Freiflug von v · dt auf die exakte Positionsdifferenz des Ankers umgestellt (`src/nav/frameCarry.ts`, `Navigator.ts`). Orbit-Freiflug-Kontinuität über `updatePlacement(0)` in `SpaceCamera.enterFreeFlight()` und `resetMotion` abgesichert. 25 Offline-Tests in `tools/test-warp.ts`. |
 | v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
+| v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Status im PR vorerst offen für Inhaber-Entscheidung. |
 
 ---
 

@@ -44,3 +44,8 @@ Vorlage, damit die Entscheidung in fünf Minuten auf dem Tablet fällt.
 ## Nicht-Ziele
 
 Code.
+
+## Bearbeitung im PR
+
+- Entscheidungsvorlage in `docs/leitfaden.md` §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B).
+- Status bleibt gemäß Hinweis im PR `offen`, bis der Inhaber entscheidet.
