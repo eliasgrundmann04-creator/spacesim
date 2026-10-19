@@ -17,7 +17,7 @@
 | `core/constants.ts` | — |  |  |  |
 | `frames/FrameTree.ts` | — | ✓ |  | frames/types, nav/vec |
 | `frames/types.ts` | — | ✓ |  | nav/vec |
-| `main.ts` | über core/Engine |  |  | core/Engine |
+| `main.ts` | über core/Engine |  |  | core/Engine, ui/TuningPanel |
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
 | `nav/Navigator.ts` | — | ✓ |  | nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
@@ -41,6 +41,7 @@
 | `terrain/terrainWorker.ts` | — |  |  | terrain/tileGeometry |
 | `terrain/tileGeometry.ts` | — | ✓ | ⚠ | terrain/noise |
 | `ui/FlightControls.ts` | — |  |  | nav/format, nav/types |
+| `ui/TuningPanel.ts` | — |  |  | nav/feel |
 | `universe/CelestialBody.ts` | direkt |  |  | core/constants, math/Vector3d, physics/Kepler |
 | `universe/Planet.ts` | direkt |  |  | math/Vector3d, terrain/PlanetLOD, terrain/noise, terrain/tileGeometry, universe/CelestialBody |
 | `universe/Star.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
@@ -53,13 +54,14 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
 - `npm run test:orientation` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orientation.ts`
 - `npm run test:drag` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-drag.ts`
 - `npm run test:glide` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-glide.ts`
+- `npm run test:feel` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-feel.ts`
 - `npm run test:throughput` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts`
 - `npm run contracts` — `node tools/contracts.mjs`
 - `npm run check` — `npm run typecheck && npm test && node tools/contracts.mjs --check && vite build`
@@ -248,6 +250,12 @@
 - `const DEFAULT_FEEL: Readonly<FeelConfig>`
 - `const FEEL: FeelConfig`
 - `function parseFeel(search: string): void`
+- `function setFeel(key: string, value: number): boolean`
+- `function isLogScale(key: keyof FeelConfig): boolean`
+- `function valueToSlider(value: number, key: keyof FeelConfig): number`
+- `function sliderToValue(t: number, key: keyof FeelConfig): number`
+- `function feelToSearch(cfg: FeelConfig): string`
+- `function mergeFeelIntoSearch(search: string, cfg: FeelConfig): string`
 
 ### `nav/flightKernel.ts`
 
@@ -473,6 +481,11 @@
   - `setHud(text: string): void`
   - `setHudFrom(info: { anchorName?: string | null; altitude: number; relativeSpeed: number; mode: string; gotoProgress?: number; }): void`
   - `dispose(): void`
+
+### `ui/TuningPanel.ts`
+
+- `class TuningPanel`
+  - `constructor(container: HTMLElement)`
 
 ### `universe/CelestialBody.ts`
 

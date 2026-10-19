@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.9 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.10 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -316,6 +316,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.7 | Aufgabe 08: Orbit-Griff über den Rand hinaus — innen weiter exakt, dahinter Umrundung wie `orbit` (z = 0), die Drehung je px schließt am Rand stetig an (größte Stufe 0,13 %) und klingt über 150 px auf die Orbit-Rate ab; der Griffpunkt muss nach dem Zurückziehen nicht mehr unter dem Finger liegen (Inhaberentscheidung). Zwei-Finger-Drehen um die Bildmitte: Totzone 8°, danach 1:1 ohne Sprung, Wurf über die vorhandene Aufzeichnung. `grabAngle` entfällt; 59 Gesten-Tests |
 | v0.4.8 | Aufgabe 09: Kamera-Gefühl — Gefühlswerte der Steuerung (`spinTau`, `grabEdge`, `twistStartDeg`, `twistDominance`, `pinchLockPx`, `edgeFadePx`, `maxSpin`, `flingRest`) in isolierter `src/nav/feel.ts` gebündelt und per URL (`?feel=key:val`) überschreibbar. Gleichmäßiger Orbit über den Rand, Nachlauf verlängert (spinTau 0,8 s), Dreheinrasten gedämpft (20°, Dominanz, Pinch-Sperre). 47 Gesten-Tests in `tools/test-drag.ts`. |
 | v0.4.9 | Aufgabe 10: Gleitflug-Pinch (`?feel=glide:1`). Pinch steuert Schub und Bremsen mit Bremsraste, `glideMax`/`glideMaxBack`, framerate-unabhängigem Abklingen (`glideHalfLife`) und verzögerter Kopplung der Flugrichtung an den Blick (`glideCoupleTau`). 12 Offline-Tests in `tools/test-glide.ts`. |
+| v0.4.10 | Aufgabe 11: Tuning-Panel (`?tune`). Live-Abstimmung aller Gefühlswerte im Flug per Regler ohne Neuladen; automatische Adresszeilen-Nachführung, Kopierknopf und Standard-Reset. Reine Funktionen in `nav/feel.ts`, UI-Panel in `src/ui/TuningPanel.ts`. 5 Offline-Tests in `tools/test-feel.ts`. |
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 id: 11
 titel: Tuning-Panel — Gefühlswerte live mit Reglern abstimmen
-status: offen
+status: erledigt
 braucht: [10]
 stufe: —
 tablet: ja

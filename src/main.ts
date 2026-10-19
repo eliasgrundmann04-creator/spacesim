@@ -1,9 +1,16 @@
 import { Engine } from './core/Engine';
+import { TuningPanel } from './ui/TuningPanel';
 
 const app = document.getElementById('app')!;
 const hud = document.getElementById('hud')!;
 
-Engine.create(app, hud).catch((e: unknown) => {
+Engine.create(app, hud)
+  .then(() => {
+    if (new URLSearchParams(window.location.search).has('tune')) {
+      new TuningPanel(app);
+    }
+  })
+  .catch((e: unknown) => {
   console.error(e);
   const err = document.getElementById('err')!;
   err.style.display = 'grid';

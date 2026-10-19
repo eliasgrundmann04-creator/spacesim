@@ -131,6 +131,87 @@ export function parseFeel(search: string): void {
   }
 }
 
+export function setFeel(key: string, value: number): boolean {
+  if (!(key in DEFAULT_FEEL)) return false;
+  if (!Number.isFinite(value)) return false;
+  const k = key as keyof FeelConfig;
+  const range = FEEL_RANGES[k];
+  FEEL[k] = clamp(value, range.min, range.max);
+  return true;
+}
+
+export function isLogScale(key: keyof FeelConfig): boolean {
+  const range = FEEL_RANGES[key];
+  return range.min > 0 && range.max / range.min >= 20;
+}
+
+export function valueToSlider(value: number, key: keyof FeelConfig): number {
+  const range = FEEL_RANGES[key];
+  const v = clamp(value, range.min, range.max);
+  if (isLogScale(key)) {
+    return (Math.log(v) - Math.log(range.min)) / (Math.log(range.max) - Math.log(range.min));
+  }
+  return (v - range.min) / (range.max - range.min);
+}
+
+export function sliderToValue(t: number, key: keyof FeelConfig): number {
+  const range = FEEL_RANGES[key];
+  const clampedT = clamp(t, 0, 1);
+  if (isLogScale(key)) {
+    return Math.exp(Math.log(range.min) + clampedT * (Math.log(range.max) - Math.log(range.min)));
+  }
+  return range.min + clampedT * (range.max - range.min);
+}
+
+export function feelToSearch(cfg: FeelConfig): string {
+  const pairs: string[] = [];
+  const keys = Object.keys(DEFAULT_FEEL) as (keyof FeelConfig)[];
+  for (const k of keys) {
+    const val = Number(cfg[k].toPrecision(4));
+    const def = Number(DEFAULT_FEEL[k].toPrecision(4));
+    if (val !== def) {
+      pairs.push(`${k}:${val}`);
+    }
+  }
+  return pairs.length > 0 ? `feel=${pairs.join(',')}` : '';
+}
+
+export function mergeFeelIntoSearch(search: string, cfg: FeelConfig): string {
+  const hasQuestion = search.startsWith('?');
+  const raw = hasQuestion ? search.slice(1) : search;
+  const feelStr = feelToSearch(cfg);
+
+  if (!raw) {
+    return feelStr ? `?${feelStr}` : '';
+  }
+
+  const items = raw.split('&').filter((item) => item.length > 0);
+  let replaced = false;
+  const resultItems: string[] = [];
+
+  for (const item of items) {
+    const eqIdx = item.indexOf('=');
+    const key = eqIdx >= 0 ? item.slice(0, eqIdx) : item;
+    if (key === 'feel') {
+      if (!replaced) {
+        if (feelStr) {
+          resultItems.push(feelStr);
+        }
+        replaced = true;
+      }
+    } else {
+      resultItems.push(item);
+    }
+  }
+
+  if (!replaced && feelStr) {
+    resultItems.push(feelStr);
+  }
+
+  if (resultItems.length === 0) return '';
+  return `?${resultItems.join('&')}`;
+}
+
 // Einmalige Übernahme aus globalThis.location?.search
 if (typeof globalThis !== 'undefined' && globalThis.location?.search) {
   parseFeel(globalThis.location.search);
