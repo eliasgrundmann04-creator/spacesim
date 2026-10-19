@@ -11,7 +11,9 @@
 | `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
 | `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
-| `core/Engine.ts` | direkt |  | ⚠ | camera/SpaceCamera, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/format, nav/picking, nav/types, nav/vec, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls, universe/CelestialBody, universe/UniverseManager |
+| `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
+| `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
+| `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
 | `core/constants.ts` | — |  |  |  |
@@ -118,6 +120,33 @@
 
 - `class Engine`
   - `static async create(container: HTMLElement, hud: HTMLElement): Promise<Engine>`
+
+### `core/EngineHud.ts`
+
+- `interface HudContext { clock, smoothedFrameMs, renderScale, terrain, nav, camera, flightControls }`
+- `class EngineHud`
+  - `constructor(private readonly hud: HTMLElement)`
+  - `update(ctx: HudContext): void`
+- `function shortWarp(warp: number): string`
+- `function readBackendChoice(): TerrainBackendChoice`
+- `function buildProbe(): { field: TerrainField; tile: TileSpec }`
+
+### `core/EngineInput.ts`
+
+- `interface EngineInputCallbacks { getCamera, clock, sceneManager, getUniverse, navigator, getDomElement, getNav, setGotoUid, getGotoUid }`
+- `class EngineInput`
+  - `readonly navBodies: BodyRef[]`
+  - `readonly byUid: Map`
+  - `constructor(private readonly cb: EngineInputCallbacks)`
+  - `bindInput(): void`
+  - `action(act: string): void`
+  - `setTarget(body: CelestialBody): void`
+  - `cycleTarget(direction: 1 | -1): void`
+  - `gotoAtScreen(x: number, y: number): void`
+  - `collectBodies(): void`
+  - `bodyRef(body: CelestialBody): BodyRef`
+- `function isFinite3(v: { x: number; y: number; z: number }): boolean`
+- `function toVec(v: { x: number; y: number; z: number }): Vec3`
 
 ### `core/SceneManager.ts`
 
