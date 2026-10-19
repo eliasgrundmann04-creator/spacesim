@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { Vector3d } from '../math/Vector3d';
 import { LY } from '../core/constants';
 import type { CelestialBody } from '../universe/CelestialBody';
+import type { NavInput } from '../nav/types';
 import type { Vec3 } from '../nav/vec';
 import { vec3 } from '../nav/vec';
 import type { Quat } from '../nav/orientation';
@@ -77,6 +78,10 @@ export class SpaceCamera {
     });
   }
 
+  navInput(base: NavInput, dt: number): NavInput {
+    return this.touchInput.glide.step(dt, this.basis(), base);
+  }
+
   private orbitView(): OrbitView | null {
     const t = this.target;
     if (this.mode !== 'orbit' || !t) return null;
@@ -103,6 +108,7 @@ export class SpaceCamera {
     this.targetDistance = body.radius * 6;
     this.distance = this.targetDistance;
     this.touchInput.fling.stop();
+    this.touchInput.glide.reset();
   }
 
   /**
@@ -114,6 +120,7 @@ export class SpaceCamera {
     this.mode = 'orbit';
     this.pendingDolly = 1;
     this.touchInput.fling.stop();
+    this.touchInput.glide.reset();
 
     const dx = this.worldPosition.x - body.position.x;
     const dy = this.worldPosition.y - body.position.y;

@@ -8,9 +8,9 @@
 
 | Datei | three | Kern | Deckel | hängt ab von |
 |---|---|---|---|---|
-| `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, math/Vector3d, nav/dragKernel, nav/orientation, nav/vec, universe/CelestialBody |
+| `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
 | `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
-| `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/fling, nav/vec |
+| `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
 | `core/Engine.ts` | direkt |  | ⚠ | camera/SpaceCamera, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/format, nav/picking, nav/types, nav/vec, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
@@ -26,6 +26,7 @@
 | `nav/flightKernel.ts` | — | ✓ |  | nav/proximity, nav/types, nav/vec |
 | `nav/fling.ts` | — | ✓ |  | nav/feel, nav/vec |
 | `nav/format.ts` | — | ✓ |  |  |
+| `nav/glide.ts` | — | ✓ |  | nav/feel, nav/flightKernel, nav/types, nav/vec |
 | `nav/gotoKernel.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/orientation.ts` | — | ✓ |  | nav/vec |
 | `nav/picking.ts` | — | ✓ |  | nav/types, nav/vec |
@@ -52,12 +53,13 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
 - `npm run test:orientation` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orientation.ts`
 - `npm run test:drag` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-drag.ts`
+- `npm run test:glide` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-glide.ts`
 - `npm run test:throughput` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts`
 - `npm run contracts` — `node tools/contracts.mjs`
 - `npm run check` — `npm run typecheck && npm test && node tools/contracts.mjs --check && vite build`
@@ -73,6 +75,7 @@
   - `target: CelestialBody | null`
   - `mode: CameraMode`
   - `constructor(private readonly dom: HTMLElement)`
+  - `navInput(base: NavInput, dt: number): NavInput`
   - `focus(body: CelestialBody): void`
   - `enterOrbit(body: CelestialBody): void`
   - `enterFreeFlight(): void`
@@ -102,6 +105,7 @@
 - `interface CameraTouchCallbacks { getFovYRadians, getOrbitView, getMode, applyStep, zoomBy }`
 - `class CameraTouchInput`
   - `readonly fling: Fling`
+  - `readonly glide: Glide`
   - `constructor(private readonly dom: HTMLElement, private readonly callbacks: CameraTouchCallbacks)`
 
 ### `core/Engine.ts`
@@ -238,7 +242,7 @@
 
 ### `nav/feel.ts`
 
-- `interface FeelConfig { spinTau, maxSpin, flingRest, grabEdge, edgeFadePx, twistStartDeg, twistDominance, pinchLockPx }`
+- `interface FeelConfig { spinTau, maxSpin, flingRest, grabEdge, edgeFadePx, twistStartDeg, twistDominance, pinchLockPx, glide, glideGain, glideBrake, glideMax, glideMaxBack, glideHalfLife, glideCoupleTau }`
 - `interface FeelRange { min, max }`
 - `const FEEL_RANGES: Record<keyof FeelConfig, FeelRange>`
 - `const DEFAULT_FEEL: Readonly<FeelConfig>`
@@ -271,6 +275,17 @@
 - `function formatDistance(m: number): string`
 - `function formatSpeed(mps: number): string`
 - `function formatScale(scale: number): string`
+
+### `nav/glide.ts`
+
+- `class Glide`
+  - `getSpeed(): number`
+  - `getDirection(): Vec3`
+  - `reset(): void`
+  - `begin(): void`
+  - `end(): void`
+  - `pinch(lambda: number): void`
+  - `step(dt: number, basis: { forward: Vec3; right: Vec3; up: Vec3 }, base: NavInput): NavInput`
 
 ### `nav/gotoKernel.ts`
 
