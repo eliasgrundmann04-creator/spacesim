@@ -139,6 +139,7 @@ export class SpaceCamera {
   /** In den Freiflug wechseln. Position und Blickrichtung bleiben, wie sie sind. */
   enterFreeFlight(): void {
     if (this.mode === 'free') return;
+    this.updatePlacement(0);
     this.mode = 'free';
     this.pendingDolly = 1;
   }

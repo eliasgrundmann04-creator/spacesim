@@ -20,13 +20,14 @@
 | `main.ts` | über core/Engine |  |  | core/Engine, ui/TuningPanel |
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
-| `nav/Navigator.ts` | — | ✓ |  | nav/autoPace, nav/feel, nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
+| `nav/Navigator.ts` | — | ✓ |  | nav/autoPace, nav/feel, nav/flightKernel, nav/frameCarry, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
 | `nav/autoPace.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/dragKernel.ts` | — | ✓ |  | nav/feel, nav/orientation, nav/vec |
 | `nav/feel.ts` | — | ✓ |  |  |
 | `nav/flightKernel.ts` | — | ✓ |  | nav/autoPace, nav/feel, nav/proximity, nav/types, nav/vec |
 | `nav/fling.ts` | — | ✓ |  | nav/feel, nav/vec |
 | `nav/format.ts` | — | ✓ |  |  |
+| `nav/frameCarry.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/glide.ts` | — | ✓ |  | nav/feel, nav/flightKernel, nav/types, nav/vec |
 | `nav/gotoKernel.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/orientation.ts` | — | ✓ |  | nav/vec |
@@ -55,8 +56,9 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
+- `npm run test:warp` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts`
 - `npm run test:pace` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-pace.ts`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
@@ -218,6 +220,7 @@
   - `getRelativeVelocity(): Vec3`
   - `getFrameVelocity(): Vec3`
   - `setRelativeVelocity(v: Vec3): void`
+  - `resetMotion(anchor: BodyRef | null): void`
   - `requestGoto(cameraPos: Vec3, target: BodyRef, preferredDir?: Vec3): void`
   - `cancelGoto(): void`
   - `update(frame: NavFrame, bodies: readonly BodyRef[], input: NavInput, dt: number): NavResult`
@@ -293,6 +296,15 @@
 - `function formatDistance(m: number): string`
 - `function formatSpeed(mps: number): string`
 - `function formatScale(scale: number): string`
+
+### `nav/frameCarry.ts`
+
+- `interface FrameCarryState { frameVelocity, lastAnchorId, lastAnchorPos, carry }`
+- `function createFrameCarryState(): FrameCarryState`
+- `function clampMagnitude(v: Vec3, max: number): Vec3`
+- `function applyFrameCarry(position: Vec3, state: FrameCarryState, bodies: readonly BodyRef[]): { start: Vec3; carried: boolean }`
+- `function updateCarry(state: FrameCarryState, anchor: BodyRef | null): void`
+- `function trackFrameVelocity(state: FrameCarryState, anchor: BodyRef | null, dt: number, frameVelocityTau: number, lastReferenceSpeed: number, relVelocity: Vec3): Vec3`
 
 ### `nav/glide.ts`
 
