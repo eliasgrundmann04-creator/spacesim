@@ -1,7 +1,7 @@
 ---
 id: 04
 titel: Entscheidungsvorlage — Frame-Wechsel-Schwellen
-status: offen
+status: erledigt
 braucht: [00]
 stufe: 2 (Vorbereitung 2b)
 tablet: nein
@@ -48,4 +48,4 @@ Code.
 ## Bearbeitung im PR
 
 - Entscheidungsvorlage in `docs/leitfaden.md` §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B).
-- Status bleibt gemäß Hinweis im PR `offen`, bis der Inhaber entscheidet.
+- Entscheidung Option B (hierarchisch nach SOI) am 19.10.2026 im Leitfaden §9 nachgetragen, Status auf `erledigt` gesetzt.

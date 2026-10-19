@@ -262,9 +262,9 @@ Neue Rechenkerne so schneiden, dass sie in Node testbar sind — das ist der Gru
 
 Zu entscheiden, wenn die jeweilige Stufe ansteht:
 
-- **Frame-Wechsel-Schwellen** (Stufe 2): distanzbasiert, hierarchisch nach SOI, oder nach Winkelgröße?
+- **Frame-Wechsel-Schwellen** (Stufe 2): **Entschieden am 19.10.2026:** Option B (hierarchisch nach SOI). Die Koordinatengrenzen entsprechen exakt den stärksten Beschleunigungsfeldern und der Kepler-Baumstruktur.
 
-  *(Entscheidungsvorlage aus Aufgabe 04 — Stand v0.4.14; Entscheidungsstatus im PR: offen)*
+  *(Entscheidungsvorlage aus Aufgabe 04 — Stand v0.4.14)*
 
   ### Option A: Distanzbasiert (Feste Radien-Vielfache)
   - **Regel:** Wechsel in den Frame eines Körpers, wenn der Abstand $d \le k \cdot R$ (z. B. $k = 100 \cdot R$) unterschreitet; Stern-System-Wechsel bei festem Lichtjahr-Radius.
@@ -356,7 +356,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.11 | Aufgabe 12: Automatisches Tempo. Kontaktzeit-Begrenzer (`contactCap`, `softCap`) zur weichen Drosselung beim Anflug, direkte Annäherungskappung nach Relaxation; Stufen-Rückführung (`relaxStage`) im freien Flug mit einseitiger Rückführung auf ×1 bei Positionsveränderung. Isolierte Kernfunktionen in `src/nav/autoPace.ts`. 16 Offline-Tests in `tools/test-pace.ts`. |
 | v0.4.12 | Aufgabe 13: Warp-Mitführung über Verschiebung. Mitführung im Freiflug von v · dt auf die exakte Positionsdifferenz des Ankers umgestellt (`src/nav/frameCarry.ts`, `Navigator.ts`). Orbit-Freiflug-Kontinuität über `updatePlacement(0)` in `SpaceCamera.enterFreeFlight()` und `resetMotion` abgesichert. 25 Offline-Tests in `tools/test-warp.ts`. |
 | v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
-| v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Status im PR vorerst offen für Inhaber-Entscheidung. |
+| v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Nachtrag: Entscheidung für Option B (hierarchisch nach SOI) am 19.10.2026 eingetragen. |
 
 ---
 
