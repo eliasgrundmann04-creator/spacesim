@@ -47,6 +47,7 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 10 | Gleitflug — Pinch ist Schub, die Bewegung gleitet weiter | 09 | ja |
 | 11 | Tuning-Panel — Gefühlswerte live mit Reglern abstimmen | 10 | ja |
 | 12 | Automatisches Tempo — Anflug nach Kontaktzeit, Stufe läuft zur Umgebung zurück | 11 | ja |
+| 13 | Fix: Kamera bleibt bei Zeitraffer über dem Anker — Mitführung über die Verschiebung | 12 | ja |
 
 **Eine nach der anderen.** 01–04 hängen nicht voneinander ab, aber parallele PRs kollidieren in
 `package.json` (Version), `docs/contracts.md` und Leitfaden §2/§11. Für ein Einpersonenprojekt kostet
