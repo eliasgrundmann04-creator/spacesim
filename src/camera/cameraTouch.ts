@@ -1,6 +1,8 @@
 import type { DragKind, DragView, OrbitView, ScreenPoint, Twist } from '../nav/dragKernel';
 import { beginTwist, chooseDrag, dragTurn, twistTurn } from '../nav/dragKernel';
+import { FEEL } from '../nav/feel';
 import { Fling } from '../nav/fling';
+import { Glide } from '../nav/glide';
 import type { Vec3 } from '../nav/vec';
 import { ZERO, add, scale } from '../nav/vec';
 
@@ -22,6 +24,7 @@ export interface CameraTouchCallbacks {
 
 export class CameraTouchInput {
   readonly fling = new Fling();
+  readonly glide = new Glide();
 
   private dragKind: DragKind = 'look';
   private canvasRect = new DOMRect();
@@ -67,6 +70,7 @@ export class CameraTouchInput {
     const release = (e: PointerEvent): void => {
       if (!this.pointers.delete(e.pointerId)) return;
       if (dom.hasPointerCapture(e.pointerId)) dom.releasePointerCapture(e.pointerId);
+      if (this.pointers.size < 2) this.glide.end();
       // Bei 3 → 2 Fingern die Pinch-Basis neu setzen, sonst springt der Zoom
       if (this.pointers.size === 2) this.beginPinch();
       else this.pinchDistance = 0;
@@ -81,6 +85,7 @@ export class CameraTouchInput {
       this.pointers.clear();
       this.pinchDistance = 0;
       this.fling.stop();
+      this.glide.end();
     });
 
     dom.addEventListener('wheel', (e) => {
@@ -128,6 +133,9 @@ export class CameraTouchInput {
     this.pinchX = (a.x + b.x) / 2;
     this.pinchY = (a.y + b.y) / 2;
     this.twist = beginTwist(a, b);
+    if (FEEL.glide >= 0.5) {
+      this.glide.begin();
+    }
   }
 
   private updatePinch(time: number): void {
@@ -137,13 +145,19 @@ export class CameraTouchInput {
     const midY = (a.y + b.y) / 2;
 
     if (this.pinchDistance > 0) {
-      // Auseinanderziehen (dist wächst) ⇒ heranzoomen ⇒ Distanz sinkt
-      this.callbacks.zoomBy(this.pinchDistance / dist);
+      if (FEEL.glide >= 0.5) {
+        const lambda = Math.log(dist / this.pinchDistance);
+        this.glide.pinch(lambda);
+      } else {
+        // Auseinanderziehen (dist wächst) ⇒ heranzoomen ⇒ Distanz sinkt
+        this.callbacks.zoomBy(this.pinchDistance / dist);
+      }
       // Schwenk dreht mit, nie als Griff (zwei Finger halten keinen Punkt); die Fingerlinie dreht das Bild
       const kind = this.callbacks.getMode() === 'orbit' ? 'orbit' : 'look';
       const twist = twistTurn(this.twist, a, b);
       this.twist = twist.twist;
-      this.turn(kind, { x: this.pinchX, y: this.pinchY }, { x: midX, y: midY }, PAN_GAIN, time, twist.turn);
+      const panGain = FEEL.glide >= 0.5 ? 0 : PAN_GAIN;
+      this.turn(kind, { x: this.pinchX, y: this.pinchY }, { x: midX, y: midY }, panGain, time, twist.turn);
     }
 
     this.pinchDistance = dist;

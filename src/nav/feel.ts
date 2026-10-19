@@ -23,6 +23,21 @@ export interface FeelConfig {
   twistDominance: number;
   /** Abstandsänderung in px, nach der Drehen bis zum Loslassen gesperrt ist. */
   pinchLockPx: number;
+
+  /** ≥ 0,5 schaltet den Gleit-Modus ein. */
+  glide: number;
+  /** h/s je ln-Einheit Spreizung. */
+  glideGain: number;
+  /** h/s je ln-Einheit beim Bremsen. */
+  glideBrake: number;
+  /** Höchstgeschwindigkeit vorwärts in h/s. */
+  glideMax: number;
+  /** Höchstgeschwindigkeit rückwärts in h/s. */
+  glideMaxBack: number;
+  /** Halbwertszeit des Gleitens in s. */
+  glideHalfLife: number;
+  /** Zeitkonstante, mit der die Flugrichtung dem Blick folgt, in s. */
+  glideCoupleTau: number;
 }
 
 export interface FeelRange {
@@ -39,6 +54,14 @@ export const FEEL_RANGES: Record<keyof FeelConfig, FeelRange> = {
   twistStartDeg: { min: 0, max: 60 },
   twistDominance: { min: 0, max: 5 },
   pinchLockPx: { min: 5, max: 300 },
+
+  glide: { min: 0, max: 1 },
+  glideGain: { min: 0.05, max: 10 },
+  glideBrake: { min: 0.05, max: 20 },
+  glideMax: { min: 0.1, max: 90 },
+  glideMaxBack: { min: 0, max: 10 },
+  glideHalfLife: { min: 0.3, max: 60 },
+  glideCoupleTau: { min: 0.02, max: 5 },
 };
 
 export const DEFAULT_FEEL: Readonly<FeelConfig> = {
@@ -50,6 +73,14 @@ export const DEFAULT_FEEL: Readonly<FeelConfig> = {
   twistStartDeg: 20,
   twistDominance: 1.5,
   pinchLockPx: 40,
+
+  glide: 0,
+  glideGain: 0.8,
+  glideBrake: 1.6,
+  glideMax: 3,
+  glideMaxBack: 0.5,
+  glideHalfLife: 5,
+  glideCoupleTau: 0.5,
 };
 
 /** Global steuerbares Gefühlskonfigurationsobjekt. */

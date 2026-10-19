@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.8 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.9 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,9 +24,9 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.8)
+## 2. Aktueller Stand (v0.4.9)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 151 Offline-Tests (7 Frame-Baum, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 27 Durchsatz), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 163 Offline-Tests (7 Frame-Baum, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
@@ -35,7 +35,7 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Hybrides Universum: JSON-Katalog (Sol-System) + prozedurale Sterne im 16-Lj-Umkreis (~70–100 Sterne, entspricht realer Dichte), Systeme lazy instanziiert
 - Cube-Sphere-LOD-Quadtree bis Level 14 (~50 m Vertexabstand), asynchron über Worker-Pool; optionaler WGSL-Compute-Pfad via TSL (`?terrain=gpu`) mit Selbsttest und Fallback
 - Kachel-Pipeline mit Wachhund: unbeantwortete Worker-Jobs werden erkannt und einmal neu gestellt, nach sechs Verlusten dauerhafter Wechsel auf den synchronen Pfad; Prioritäten werden jedes Frame nachgeführt
-- **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kern liegt isoliert und three-frei in `src/nav/`
+- **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kern liegt isoliert und three-frei in `src/nav/`. Gleit-Modus (`?feel=glide:1`): Pinch steuert Schub und Bremsen mit Bremsraste und framerate-unabhängigem Abklingen; die Flugrichtung folgt dem Blick verzögert.
 - Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, über den Planetenrand hinaus läuft die Umrundung stetig weiter; im Freiflug dreht das Bild nie um seine Mitte — außer beim Zwei-Finger-Drehen (ab 20°, mit Pinch-Sperre und Dominanzprüfung, seit v0.4.8). Alle Gefühlswerte liegen isoliert in `nav/feel.ts` und sind live per URL (`?feel=...`) überschreibbar. Seit v0.4.6 ist `SpaceCamera.ts` unter den Dateideckel geteilt (`cameraTouch.ts` three-frei, `cameraPlacement.ts`)
 - Adaptive Renderauflösung (0,7×–2×)
 - Laufzeit-Selbsttest in `Engine`: warnt, wenn die Kamera ohne Schub von ihrem Anker wegdriftet — diagnostiziert Verwechslungen von `dtReal` und `dtSim`
@@ -182,7 +182,7 @@ Freier Flug mit Geschwindigkeit ∝ Distanz zum nächsten Körper; „Goto" als 
 
 **Stufe 2 — Verschachtelte Bezugsrahmen**
 Frame-Baum mit lokalen Ursprüngen; Kamera wird beim Überschreiten von Schwellen umgehängt. Alle Positionen werden relativ zum aktuellen Frame aufgelöst.
-*Fertig, wenn:* eine Sternposition in 100.000 Lj und ein Fels auf der Erde im selben Programmlauf beide korrekt sind — nachweisbar über einen Offline-Test, der Positionen über mehrere Frame-Wechsel hin- und zurückrechnet.
+*Fertig, wenn:* eine Sternposition in 100.000 Lj und ein Fels auf der Erde im selben Programmlauf beide korrekt sind — nachweisbar über einen Offline-Test, der Positionen über mehere Frame-Wechsel hin- und zurückrechnet.
 *Risiko:* invasivster Umbau; `SceneManager`, `CelestialBody`, `SpaceCamera`, `UniverseManager` sind betroffen.
 *Schnitt:* Aufgaben 01–06 in `docs/aufgaben/` (2a, Vorbereitung, Entscheidungsvorlage, 2b, 2c).
 
@@ -312,9 +312,10 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.3 | `SPICKZETTEL.md` für den Inhaber; `AGENTS.md`: PR-Beschreibung vollständig nach Vorlage inklusive Testausgabe und `Fixes #…`; Vorlage um *Testausgabe* ergänzt; Aufgabe 04 an die Versionsregel angeglichen |
 | v0.4.4 | Aufgabe 07: Touch-Gesten. Orbit: der berührte Bodenpunkt bleibt unter dem Finger (vorher lief der Körper dem Finger entgegen), zum Planetenrand stetig gesättigt statt unbegrenzt. Roll-Nivellierung entfernt — sie drehte das Bild nach schrägen Gesten ungefragt um seine Mitte. Wurf als Ausgleichsgerade über 100 ms, kein Wurf nach Ruhen, Nachlauf framerate-unabhängig integriert. Neue three-freie Kerne `nav/dragKernel.ts` und `nav/fling.ts` mit 38 Offline-Tests; `SpaceCamera.ts` 476 → 473 Zeilen |
 | v0.4.5 | Stufe 2a (Aufgabe 01): Frame-Baum als reine, three-freie Datenstruktur (`src/frames/`). `createFrame`, `attachFrame`, `findLCA`, `transformPoint` mit präziser LCA-Ablösung. 7 Offline-Tests in `tools/test-frames.ts` inklusive Nah-bei-Nah-, Fern-, Roundtrip- (≤ 4 · ε · max|p|), Gegenprobe- und Bewegungs-Tests. |
-| v0.4.6 | Vorbereitung 2b (Aufgabe 02): `SpaceCamera.ts` unter den Dateideckel geteilt (473 → 244 Zeilen). Gesten- und Touch-Eingabe in `cameraTouch.ts` (three-frei), Platzierungs- und Near-Plane-Logik in `cameraPlacement.ts`. `CAP_BASELINE`-Eintrag für `SpaceCamera.ts` entfernt. |
+| v0.4.6 | Vorbereitung 2b (Aufgabe 02): `SpaceCamera.ts` unter den Deckel geteilt (473 → 244 Zeilen). Gesten- und Touch-Eingabe in `cameraTouch.ts` (three-frei), Platzierungs- und Near-Plane-Logik in `cameraPlacement.ts`. `CAP_BASELINE`-Eintrag für `SpaceCamera.ts` entfernt. |
 | v0.4.7 | Aufgabe 08: Orbit-Griff über den Rand hinaus — innen weiter exakt, dahinter Umrundung wie `orbit` (z = 0), die Drehung je px schließt am Rand stetig an (größte Stufe 0,13 %) und klingt über 150 px auf die Orbit-Rate ab; der Griffpunkt muss nach dem Zurückziehen nicht mehr unter dem Finger liegen (Inhaberentscheidung). Zwei-Finger-Drehen um die Bildmitte: Totzone 8°, danach 1:1 ohne Sprung, Wurf über die vorhandene Aufzeichnung. `grabAngle` entfällt; 59 Gesten-Tests |
 | v0.4.8 | Aufgabe 09: Kamera-Gefühl — Gefühlswerte der Steuerung (`spinTau`, `grabEdge`, `twistStartDeg`, `twistDominance`, `pinchLockPx`, `edgeFadePx`, `maxSpin`, `flingRest`) in isolierter `src/nav/feel.ts` gebündelt und per URL (`?feel=key:val`) überschreibbar. Gleichmäßiger Orbit über den Rand, Nachlauf verlängert (spinTau 0,8 s), Dreheinrasten gedämpft (20°, Dominanz, Pinch-Sperre). 47 Gesten-Tests in `tools/test-drag.ts`. |
+| v0.4.9 | Aufgabe 10: Gleitflug-Pinch (`?feel=glide:1`). Pinch steuert Schub und Bremsen mit Bremsraste, `glideMax`/`glideMaxBack`, framerate-unabhängigem Abklingen (`glideHalfLife`) und verzögerter Kopplung der Flugrichtung an den Blick (`glideCoupleTau`). 12 Offline-Tests in `tools/test-glide.ts`. |
 
 ---
 

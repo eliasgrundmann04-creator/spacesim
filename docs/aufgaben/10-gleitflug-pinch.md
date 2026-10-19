@@ -1,7 +1,7 @@
 ---
 id: 10
 titel: Gleitflug — Pinch ist Schub, die Bewegung gleitet weiter
-status: offen
+status: erledigt
 braucht: [09]
 stufe: —
 tablet: ja

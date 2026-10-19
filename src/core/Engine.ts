@@ -186,7 +186,7 @@ export class Engine {
    * Planet davonrast — genau der Fehler, den die Offline-Tests abfangen.
    */
   private stepNavigation(dt: number): void {
-    const input = this.flightControls.input;
+    const input = this.camera.navInput(this.flightControls.input, dt);
 
     // Schub aus dem Orbitmodus heraus löst den Freiflug aus. Die Kamera war bis
     // dahin starr am Ziel montiert, die Relativgeschwindigkeit ist also null.
