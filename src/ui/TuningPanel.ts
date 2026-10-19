@@ -25,6 +25,9 @@ const LABELS: Record<keyof FeelConfig, string> = {
   twistStartDeg: 'Dreh-Schwelle',
   twistDominance: 'Bogen-Dominanz',
   pinchLockPx: 'Pinch-Sperre',
+  autoPace: 'Auto-Tempo',
+  ttcMin: 'TTC Min (s)',
+  stageHalfDecades: 'Halbwerts-Dekaden',
 };
 
 const GROUPS: Array<{ title: string; keys: (keyof FeelConfig)[] }> = [

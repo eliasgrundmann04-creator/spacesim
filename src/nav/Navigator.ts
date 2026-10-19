@@ -7,6 +7,9 @@ import { DEFAULT_FLIGHT, stepFlight } from './flightKernel';
 import type { GotoConfig, GotoPlan } from './gotoKernel';
 import { DEFAULT_GOTO, advanceGoto, gotoFinished, gotoProgress, planGoto, sampleGoto, sampleGotoVelocity } from './gotoKernel';
 import { evaluateProximity } from './proximity';
+import type { AutoPaceState } from './autoPace';
+import { createAutoPaceState, relaxStage } from './autoPace';
+import { FEEL } from './feel';
 
 export type NavMode = 'free' | 'goto';
 
@@ -78,6 +81,8 @@ export class Navigator {
     return copy(this.frameVelocity);
   }
 
+  private paceState: AutoPaceState = createAutoPaceState();
+
   /**
    * Setzt die Relativgeschwindigkeit direkt — z. B. nachdem die Terrainkollision in
    * `SpaceCamera` die Position geklemmt hat und die radiale Komponente weg soll.
@@ -99,6 +104,11 @@ export class Navigator {
     this.lastTargetPos = null;
   }
 
+  /**
+   * Führt einen Navigationsschritt aus.
+   * Seiteneffekt: Im freien Flug wird `input.speedScale` durch die Rückführung der Stufe
+   * (`relaxStage`) direkt modifiziert, damit die Anzeige der Reglerstellung folgt.
+   */
   update(frame: NavFrame, bodies: readonly BodyRef[], input: NavInput, dt: number): NavResult {
     const step = Math.max(dt, 0);
     const cmd = Math.hypot(input.forward, input.right, input.up);
@@ -127,6 +137,15 @@ export class Navigator {
   ): NavResult {
     const pre = evaluateProximity(frame.position, bodies, this.cfg.flight);
     this.trackFrameVelocity(pre.anchor, dt);
+
+    if (FEEL.autoPace >= 0.5) {
+      input.speedScale = relaxStage(
+        this.paceState,
+        input.speedScale,
+        pre.reference,
+        FEEL.stageHalfDecades,
+      );
+    }
 
     if (input.brake) this.relVelocity = vec3();
 

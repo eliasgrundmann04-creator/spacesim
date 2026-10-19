@@ -20,10 +20,11 @@
 | `main.ts` | über core/Engine |  |  | core/Engine, ui/TuningPanel |
 | `math/Vector3d.ts` | direkt |  |  |  |
 | `math/rng.ts` | — | ✓ |  |  |
-| `nav/Navigator.ts` | — | ✓ |  | nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
+| `nav/Navigator.ts` | — | ✓ |  | nav/autoPace, nav/feel, nav/flightKernel, nav/gotoKernel, nav/proximity, nav/types, nav/vec |
+| `nav/autoPace.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/dragKernel.ts` | — | ✓ |  | nav/feel, nav/orientation, nav/vec |
 | `nav/feel.ts` | — | ✓ |  |  |
-| `nav/flightKernel.ts` | — | ✓ |  | nav/proximity, nav/types, nav/vec |
+| `nav/flightKernel.ts` | — | ✓ |  | nav/autoPace, nav/feel, nav/proximity, nav/types, nav/vec |
 | `nav/fling.ts` | — | ✓ |  | nav/feel, nav/vec |
 | `nav/format.ts` | — | ✓ |  |  |
 | `nav/glide.ts` | — | ✓ |  | nav/feel, nav/flightKernel, nav/types, nav/vec |
@@ -54,8 +55,9 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:nav && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
+- `npm run test:pace` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-pace.ts`
 - `npm run test:nav` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-nav.ts`
 - `npm run test:orbit` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orbit.ts`
 - `npm run test:orientation` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-orientation.ts`
@@ -220,6 +222,14 @@
   - `cancelGoto(): void`
   - `update(frame: NavFrame, bodies: readonly BodyRef[], input: NavInput, dt: number): NavResult`
 
+### `nav/autoPace.ts`
+
+- `interface AutoPaceState { stageSet, mark, lastWritten }`
+- `function createAutoPaceState(initialSpeedScale = 1, initialReference = 1e8): AutoPaceState`
+- `function contactCap(position: Vec3, dir: Vec3, bodies: readonly BodyRef[], ttcMin: number): number`
+- `function softCap(V: number, Vcap: number): number`
+- `function relaxStage(state: AutoPaceState, speedScale: number, reference: number, halfDecades: number): number`
+
 ### `nav/dragKernel.ts`
 
 - `interface ScreenPoint { x, y }`
@@ -244,7 +254,7 @@
 
 ### `nav/feel.ts`
 
-- `interface FeelConfig { spinTau, maxSpin, flingRest, grabEdge, edgeFadePx, twistStartDeg, twistDominance, pinchLockPx, glide, glideGain, glideBrake, glideMax, glideMaxBack, glideHalfLife, glideCoupleTau }`
+- `interface FeelConfig { spinTau, maxSpin, flingRest, grabEdge, edgeFadePx, twistStartDeg, twistDominance, pinchLockPx, glide, glideGain, glideBrake, glideMax, glideMaxBack, glideHalfLife, glideCoupleTau, autoPace, ttcMin, stageHalfDecades }`
 - `interface FeelRange { min, max }`
 - `const FEEL_RANGES: Record<keyof FeelConfig, FeelRange>`
 - `const DEFAULT_FEEL: Readonly<FeelConfig>`
