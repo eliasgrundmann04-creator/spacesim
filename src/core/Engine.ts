@@ -133,7 +133,7 @@ export class Engine {
     this.camera.updateOrientation(dt);
     this.stepNavigation(dt);
     this.camera.updatePlacement(dt);
-    this.sceneManager.syncToCamera(this.camera.worldPosition, dt);
+    this.sceneManager.syncToCamera(this.camera.worldPosition, dt, this.camera.frame);
     this.terrain.pump();
 
     this.adaptResolution(dt);

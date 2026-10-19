@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import { Vector3d } from '../math/Vector3d';
 import type { CelestialBody } from '../universe/CelestialBody';
+import type { FrameNode } from '../frames/types';
+import { transformPoint } from '../frames/FrameTree';
 
 /**
  * SceneManager: Brücke zwischen der f64-Simulationswelt und der f32-GPU-Welt.
@@ -56,13 +58,24 @@ export class SceneManager {
    * Floating-Origin-Sync: platziert alle Render-Wurzeln relativ zur Kamera
    * und ruft die Per-Frame-Hooks der Körper auf (LOD, Sprites …).
    */
-  syncToCamera(cameraWorldPos: Vector3d, dt: number): void {
+  syncToCamera(cameraWorldPos: Vector3d, dt: number, cameraFrame?: FrameNode | null): void {
     for (const body of this.bodies) {
-      body.root.position.set(
-        body.position.x - cameraWorldPos.x,
-        body.position.y - cameraWorldPos.y,
-        body.position.z - cameraWorldPos.z,
-      );
+      let relX = body.position.x - cameraWorldPos.x;
+      let relY = body.position.y - cameraWorldPos.y;
+      let relZ = body.position.z - cameraWorldPos.z;
+
+      if (cameraFrame && body.frame && cameraFrame !== body.frame) {
+        const bodyInCamFrame = transformPoint(
+          { x: body.position.x, y: body.position.y, z: body.position.z },
+          body.frame,
+          cameraFrame,
+        );
+        relX = bodyInCamFrame.x - cameraWorldPos.x;
+        relY = bodyInCamFrame.y - cameraWorldPos.y;
+        relZ = bodyInCamFrame.z - cameraWorldPos.z;
+      }
+
+      body.root.position.set(relX, relY, relZ);
       body.update(dt, cameraWorldPos);
     }
   }

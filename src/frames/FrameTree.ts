@@ -1,18 +1,60 @@
 import type { Vec3 } from '../nav/vec';
-import { add, copy, sub, vec3, ZERO } from '../nav/vec';
+import { add, copy, length, sub, vec3, ZERO } from '../nav/vec';
 import type { FrameNode } from './types';
 
 /**
  * Erstellt einen neuen Frame-Knoten.
  */
-export function createFrame(id: string, name: string, position: Vec3 = ZERO): FrameNode {
+export function createFrame(id: string, name: string, position: Vec3 = ZERO, soiRadius = Infinity): FrameNode {
   return {
     id,
     name,
     parent: null,
     children: [],
     position: copy(position),
+    soiRadius,
   };
+}
+
+/**
+ * Berechnet den SOI-Radius (Sphere of Influence) nach Laplace: r_soi = a * (m / M)^(2/5)
+ */
+export function computeSoiRadius(a: number, mass: number, parentMass: number): number {
+  if (parentMass <= 0 || mass <= 0 || a <= 0) return Infinity;
+  return a * Math.pow(mass / parentMass, 0.4);
+}
+
+/**
+ * Prüft und bestimmt den besten Frame für eine Position p (relativ zum aktuellen Frame currentFrame).
+ * Verwendet Hysterese nach Option B (Leitfaden §9):
+ * - Eintritt in Kind-Frame wenn Abstand r <= 1.0 * soiRadius
+ * - Austritt aus currentFrame wenn Abstand r >= 1.15 * soiRadius
+ */
+export function updateActiveFrame(p: Vec3, currentFrame: FrameNode): { frame: FrameNode; position: Vec3 } {
+  // 1. Prüfen ob wir tiefere Kind-Frames betreten
+  for (const child of currentFrame.children) {
+    const soi = child.soiRadius ?? Infinity;
+    const dist = length(sub(p, child.position));
+    if (dist <= soi) {
+      // Eintritt in den Kind-Frame
+      const newPos = transformPoint(p, currentFrame, child);
+      // Rekursiv prüfen ob tiefere Enkel-Frames betreten werden
+      return updateActiveFrame(newPos, child);
+    }
+  }
+
+  // 2. Prüfen ob wir aus dem aktuellen Frame nach oben austreten müssen (Hysterese 1.15 * SOI)
+  if (currentFrame.parent) {
+    const soi = currentFrame.soiRadius ?? Infinity;
+    const dist = length(p); // p ist bereits lokal in currentFrame (relativ zum Ursprung des currentFrame)
+    if (dist >= 1.15 * soi) {
+      // Austritt in den Eltern-Frame
+      const newPos = transformPoint(p, currentFrame, currentFrame.parent);
+      return updateActiveFrame(newPos, currentFrame.parent);
+    }
+  }
+
+  return { frame: currentFrame, position: copy(p) };
 }
 
 /**

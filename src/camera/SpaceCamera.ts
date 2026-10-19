@@ -11,6 +11,8 @@ import type { OrbitView } from '../nav/dragKernel';
 import { applyTurn } from '../nav/dragKernel';
 import { CameraTouchInput } from './cameraTouch';
 import { applyDolly, clampToSurface, computeNearPlane, placeOrbit } from './cameraPlacement';
+import type { FrameNode } from '../frames/types';
+import { updateActiveFrame } from '../frames/FrameTree';
 
 /**
  * Kamera für 20 Größenordnungen.
@@ -38,6 +40,7 @@ export class SpaceCamera {
 
   target: CelestialBody | null = null;
   mode: CameraMode = 'orbit';
+  frame: FrameNode | null = null;
 
   /** Weltframe-Norden (Ekliptik J2000, §6) — Bezug der Startorientierung. */
   private readonly worldUp: Vec3 = vec3(0, 0, 1);
@@ -57,10 +60,14 @@ export class SpaceCamera {
   private readonly view = new THREE.Vector3();   // Blickrichtung (f32-Spiegel)
   private readonly radial = new THREE.Vector3(); // Zentrum → Kamera
 
-  constructor(private readonly dom: HTMLElement) {
+  private readonly dom: HTMLElement;
+
+  constructor(dom: HTMLElement) {
+    this.dom = dom;
+    const aspect = typeof window !== 'undefined' ? window.innerWidth / window.innerHeight : 1;
     this.camera = new THREE.PerspectiveCamera(
       55,
-      window.innerWidth / window.innerHeight,
+      aspect,
       0.2,
       1e19,
     );
@@ -168,6 +175,22 @@ export class SpaceCamera {
     this.worldPosition.set(v.x, v.y, v.z);
   }
 
+  setFrame(frame: FrameNode): void {
+    this.frame = frame;
+  }
+
+  updateFrame(): void {
+    if (!this.frame) return;
+    const res = updateActiveFrame(
+      { x: this.worldPosition.x, y: this.worldPosition.y, z: this.worldPosition.z },
+      this.frame,
+    );
+    if (res.frame !== this.frame) {
+      this.frame = res.frame;
+      this.worldPosition.set(res.position.x, res.position.y, res.position.z);
+    }
+  }
+
   /** Höhe über dem Ankerkörper — im Freiflug der Maßstab für Near-Plane und Pinch. */
   setFreeAltitude(altitude: number): void {
     this.freeAltitude = Number.isFinite(altitude) ? Math.max(altitude, 1) : 1;
@@ -219,6 +242,8 @@ export class SpaceCamera {
       this.distance = res.distance;
       this.targetDistance = res.targetDistance;
     }
+
+    this.updateFrame();
 
     this.camera.position.set(0, 0, 0);
     this.camera.quaternion.set(

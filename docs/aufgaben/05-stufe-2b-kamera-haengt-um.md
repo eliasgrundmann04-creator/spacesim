@@ -1,7 +1,7 @@
 ---
 id: 05
 titel: Stufe 2b — Kamera hängt in Frames um
-status: offen
+status: erledigt
 braucht: [01, 02, 03, 04]
 stufe: 2b
 tablet: ja
