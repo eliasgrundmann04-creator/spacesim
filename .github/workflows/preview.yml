@@ -1,0 +1,107 @@
+# Vorschau-Deploys ohne Netlify: GitHub Pages aus dem Branch gh-pages (für öffentliche Repos kostenlos).
+#   main  → https://<owner>.github.io/<repo>/
+#   PR #n → https://<owner>.github.io/<repo>/pr-<n>/   (Link kommt als Kommentar in den PR)
+# Beim Schließen eines PR wird sein Ordner entfernt. gh-pages besteht immer aus genau einem Commit,
+# damit das Repo nicht mit jedem Deploy wächst.
+# Einmalig nötig: Settings → Pages → „Deploy from a branch", Branch gh-pages, Ordner / (root).
+name: preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    # Fork-PRs bekommen kein schreibendes Token
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      CLOSED: ${{ github.event.action == 'closed' }}
+    steps:
+      - uses: actions/checkout@v7
+        if: env.CLOSED != 'true'
+      - uses: actions/setup-node@v7
+        if: env.CLOSED != 'true'
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Bauen (relative Pfade, damit die Seite in jedem Unterordner läuft)
+        if: env.CLOSED != 'true'
+        run: |
+          npm ci
+          npx vite build --base=./ --outDir "$RUNNER_TEMP/out"
+
+      - name: Nach gh-pages veröffentlichen
+        run: |
+          set -euo pipefail
+          url="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3 4 5; do
+            site="$RUNNER_TEMP/site-$attempt"
+            if git ls-remote --exit-code --heads "$url" gh-pages >/dev/null; then
+              git clone --quiet --depth 1 --branch gh-pages "$url" "$site"
+              base=$(git -C "$site" rev-parse HEAD)
+            else
+              git init --quiet -b gh-pages "$site"
+              git -C "$site" remote add origin "$url"
+              base=""
+            fi
+
+            if [ -n "$PR" ]; then
+              rm -rf "$site/pr-$PR"
+              [ "$CLOSED" = "true" ] || cp -r "$RUNNER_TEMP/out" "$site/pr-$PR"
+            else
+              # main liegt an der Wurzel; die PR-Ordner bleiben stehen
+              find "$site" -mindepth 1 -maxdepth 1 ! -name .git ! -name 'pr-*' -exec rm -rf {} +
+              cp -r "$RUNNER_TEMP/out/." "$site/"
+            fi
+            touch "$site/.nojekyll"
+
+            git -C "$site" add -A
+            tree=$(git -C "$site" write-tree)
+            commit=$(git -C "$site" commit-tree "$tree" -m "Vorschau ${PR:+PR #$PR }${GITHUB_SHA::7}")
+            # Ersetzt gh-pages nur, wenn seit dem Klonen niemand anders veröffentlicht hat
+            if git -C "$site" push --quiet --force-with-lease="gh-pages:${base}" origin "$commit:refs/heads/gh-pages"; then
+              exit 0
+            fi
+            echo "gh-pages hat sich zwischendurch geändert — neuer Versuch ($attempt)"
+            sleep $((attempt * 3))
+          done
+          exit 1
+
+      - name: Link in den PR schreiben
+        if: env.PR != '' && env.CLOSED != 'true'
+        run: |
+          set -euo pipefail
+          owner="${REPO%%/*}"; name="${REPO#*/}"
+          sha="${{ github.event.pull_request.head.sha }}"
+          link="https://${owner}.github.io/${name}/pr-${PR}/?v=${sha::7}"
+          body=$(printf '%s\n' \
+            "<!-- spacesim-preview -->" \
+            "**Vorschau (GitHub Pages):** ${link}" \
+            "" \
+            "Stand \`${sha::7}\` — nach jedem Push in ca. 1–2 Minuten erreichbar." \
+            "Weitere Schalter mit \`&\` anhängen, z. B. \`&tune\` oder \`&perf\`.")
+          id=$(gh api "repos/${REPO}/issues/${PR}/comments" --paginate \
+            --jq '.[] | select(.body | startswith("<!-- spacesim-preview -->")) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${REPO}/issues/comments/${id}" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/${REPO}/issues/${PR}/comments" -f body="$body" >/dev/null
+          fi
