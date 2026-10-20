@@ -7,6 +7,7 @@ import { TerrainField } from '../terrain/tileGeometry';
 import type { TileSpec } from '../terrain/tileGeometry';
 import { EARTH_RADIUS } from './constants';
 import { formatDistance, formatSpeed, formatScale } from '../nav/format';
+import type { FrameStats } from '../perf/frameStats';
 
 export interface HudContext {
   clock: SimClock;
@@ -16,12 +17,22 @@ export interface HudContext {
   nav: NavResult | null;
   camera: SpaceCamera;
   flightControls: FlightControls;
+  stats: FrameStats;
 }
 
 export class EngineHud {
+  private lastHudUpdate = 0;
+  private readonly perfMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('perf');
+
   constructor(private readonly hud: HTMLElement) {}
 
   update(ctx: HudContext): void {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (now - this.lastHudUpdate < 100 && this.lastHudUpdate > 0) {
+      return;
+    }
+    this.lastHudUpdate = now;
+
     const warpLabel = ctx.clock.paused ? 'PAUSE' : `×${ctx.clock.timeWarp.toLocaleString('de-DE')}`;
     const date = ctx.clock.date.toISOString().replace('T', ' ').slice(0, 16);
     const fps = (1000 / Math.max(ctx.smoothedFrameMs, 0.01)).toFixed(0);
@@ -38,16 +49,43 @@ export class EngineHud {
         ? `ANFLUG ${Math.round(n.gotoProgress * 100)} %`
         : `FLUG ${formatScale(ctx.flightControls.input.speedScale)}`;
 
-    this.hud.textContent =
+    const s = ctx.stats.getSummary(now);
+    const cpuLast = fmtNum(s.cpuLastMs);
+    const cpuP95 = fmtNum(s.cpuP95Ms);
+    const dtP50 = fmtNum(s.dtP50Ms);
+    const dtP95 = fmtNum(s.dtP95Ms);
+    const dtMax = s.dtMaxMs.toFixed(0);
+    const tri = formatCount(s.triangles);
+
+    let text =
       `${label}${frameLabel}   Höhe ${formatDistance(ctx.camera.altitude)}${speed}\n` +
       `${modeLabel}   Warp ${warpLabel}   ${date} UTC\n` +
       `${fps} fps @ ${ctx.renderScale.toFixed(2)}×   ` +
       `Terrain ${ctx.terrain.backend}${workers}   Queue ${ctx.terrain.pending}   ` +
-      `Kacheln ${ctx.terrain.built}${lost}`;
+      `Kacheln ${ctx.terrain.built}${lost}\n` +
+      `CPU ${cpuLast} ms (p95 ${cpuP95})   Bild p50 ${dtP50} / p95 ${dtP95} / max ${dtMax} ms   ` +
+      `Ruckler ${s.stutters}   Draw ${s.drawCalls}   Tri ${tri}   Geo ${s.geometries}`;
+
+    if (this.perfMode) {
+      const p = s.phaseAvgMs.map((v) => fmtNum(v));
+      text += `\nUniv ${p[0]} · Orient ${p[1]} · Nav ${p[2]} · Platz ${p[3]} · Sync ${p[4]} · Pumpe ${p[5]} · Render (CPU) ${p[6]} ms`;
+    }
+
+    this.hud.textContent = text;
 
     const warpButton = document.querySelector<HTMLElement>('#controls [data-act="warp"]');
     if (warpButton) warpButton.textContent = ctx.clock.paused ? 'Pause' : `×${shortWarp(ctx.clock.timeWarp)}`;
   }
+}
+
+function fmtNum(v: number, decimals = 1): string {
+  return v.toFixed(decimals).replace('.', ',');
+}
+
+function formatCount(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 1e6) return `${Math.round(n / 1e3)}k`;
+  return `${(n / 1e6).toFixed(1).replace('.', ',')}M`;
 }
 
 /** Vector3d / Zahl umformatieren für Warp-Button. */

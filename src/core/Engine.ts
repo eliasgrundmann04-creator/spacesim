@@ -12,6 +12,7 @@ import { THRUST_EPSILON } from '../nav/types';
 import { FlightControls } from '../ui/FlightControls';
 import { EngineHud, readBackendChoice, buildProbe } from './EngineHud';
 import { EngineInput, toVec } from './EngineInput';
+import { FrameStats } from '../perf/frameStats';
 
 /**
  * Engine: verdrahtet Renderer, Uhr, Universum, Szene und Kamera
@@ -24,6 +25,7 @@ export class Engine {
   private camera!: SpaceCamera;
   private universe!: UniverseManager;
   private readonly terrain = getTerrainProvider();
+  private readonly stats = new FrameStats();
 
   // Navigation (Stufe 1)
   private readonly navigator = new Navigator();
@@ -119,6 +121,9 @@ export class Engine {
   }
 
   private frame(): void {
+    const now = performance.now();
+    this.stats.beginFrame(now);
+
     const dt = this.clock.tick();
 
     // Frame-Choreografie:
@@ -130,13 +135,30 @@ export class Engine {
     // 6. pump
     // 7. render
     this.universe.update(this.clock.simTime, this.camera.worldPosition);
+    this.stats.mark(0);
+
     this.camera.updateOrientation(dt);
+    this.stats.mark(1);
+
     this.stepNavigation(dt);
+    this.stats.mark(2);
+
     this.camera.updatePlacement(dt);
+    this.stats.mark(3);
+
     this.sceneManager.syncToCamera(this.camera.worldPosition, dt, this.camera.frame);
+    this.stats.mark(4);
+
     this.terrain.pump();
+    this.stats.mark(5);
 
     this.adaptResolution(dt);
+
+    this.renderer.render(this.sceneManager.scene, this.camera.camera);
+    this.stats.mark(6);
+
+    this.stats.endFrame(performance.now(), this.renderer.info);
+
     this.hudHandler.update({
       clock: this.clock,
       smoothedFrameMs: this.smoothedFrameMs,
@@ -145,8 +167,8 @@ export class Engine {
       nav: this.nav,
       camera: this.camera,
       flightControls: this.flightControls,
+      stats: this.stats,
     });
-    this.renderer.render(this.sceneManager.scene, this.camera.camera);
   }
 
   private adaptResolution(dt: number): void {

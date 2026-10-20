@@ -11,8 +11,8 @@
 | `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, frames/FrameTree, frames/types, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
 | `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
-| `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
-| `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
+| `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, perf/frameStats, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
+| `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, perf/frameStats, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
 | `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | frames/FrameTree, frames/types, math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
@@ -37,6 +37,7 @@
 | `nav/proximity.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/types.ts` | — | ✓ |  | nav/vec |
 | `nav/vec.ts` | — | ✓ |  |  |
+| `perf/frameStats.ts` | — | ✓ |  |  |
 | `physics/Kepler.ts` | über math/Vector3d |  |  | core/constants, math/Vector3d |
 | `terrain/PlanetLOD.ts` | direkt |  |  | terrain/TerrainProvider, terrain/tileGeometry |
 | `terrain/TerrainProvider.ts` | über terrain/gpuTerrain |  | ⚠ | terrain/gpuTerrain, terrain/tileGeometry |
@@ -58,7 +59,7 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput && npm run test:perf`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
 - `npm run test:camera-frame` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-camera-frame.ts`
 - `npm run test:warp` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts`
@@ -70,6 +71,7 @@
 - `npm run test:glide` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-glide.ts`
 - `npm run test:feel` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-feel.ts`
 - `npm run test:throughput` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts`
+- `npm run test:perf` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-perf.ts`
 - `npm run contracts` — `node tools/contracts.mjs`
 - `npm run check` — `npm run typecheck && npm test && node tools/contracts.mjs --check && vite build`
 
@@ -127,7 +129,7 @@
 
 ### `core/EngineHud.ts`
 
-- `interface HudContext { clock, smoothedFrameMs, renderScale, terrain, nav, camera, flightControls }`
+- `interface HudContext { clock, smoothedFrameMs, renderScale, terrain, nav, camera, flightControls, stats }`
 - `class EngineHud`
   - `constructor(private readonly hud: HTMLElement)`
   - `update(ctx: HudContext): void`
@@ -435,6 +437,22 @@
 - `function slerpDir(a: Vec3, b: Vec3, t: number): Vec3`
 - `function slerpDirDerivative(a: Vec3, b: Vec3, t: number): Vec3`
 - `function relaxFactor(dt: number, tau: number): number`
+
+### `perf/frameStats.ts`
+
+- `const NUM_PHASES`
+- `const PHASE_NAMES`
+- `interface FrameStatsSummary { cpuLastMs, cpuP95Ms, dtP50Ms, dtP95Ms, dtMaxMs, stutters, drawCalls, triangles, geometries, phaseAvgMs, sampleCount }`
+- `interface RendererInfoLike { render?, memory? }`
+- `function calculatePercentile(sorted: ArrayLike<number>, len: number, p: number): number`
+- `class FrameStats`
+  - `readonly capacity: number`
+  - `readonly windowMs: number`
+  - `constructor(capacity = 1200, windowMs = 5000)`
+  - `beginFrame(nowMs: number): void`
+  - `mark(phaseIndex: number, nowMs?: number): void`
+  - `endFrame(nowMs: number, info?: RendererInfoLike): void`
+  - `getSummary(nowMs?: number): FrameStatsSummary`
 
 ### `physics/Kepler.ts`
 
