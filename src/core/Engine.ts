@@ -98,7 +98,7 @@ export class Engine {
     const start = this.universe.findBody('Erde') ?? this.sceneManager.allBodies[0];
     if (start) {
       this.universe.populateSystem(start);
-      this.universe.update(this.clock.simTime, this.camera.worldPosition, this.camera.frame);
+      this.universe.update(this.clock.simTime, this.camera.worldPosition);
       this.camera.focus(start);
     }
 
@@ -129,7 +129,7 @@ export class Engine {
     // 5. syncToCamera
     // 6. pump
     // 7. render
-    this.universe.update(this.clock.simTime, this.camera.worldPosition, this.camera.frame);
+    this.universe.update(this.clock.simTime, this.camera.worldPosition);
     this.camera.updateOrientation(dt);
     this.stepNavigation(dt);
     this.camera.updatePlacement(dt);

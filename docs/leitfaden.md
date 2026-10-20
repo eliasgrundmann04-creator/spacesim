@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.5.0 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.16 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,9 +24,9 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.5.0)
+## 2. Aktueller Stand (v0.4.16)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 181 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 6 Stufe 2, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 175 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
@@ -36,14 +36,13 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Cube-Sphere-LOD-Quadtree bis Level 14 (~50 m Vertexabstand), asynchron über Worker-Pool; optionaler WGSL-Compute-Pfad via TSL (`?terrain=gpu`) mit Selbsttest und Fallback
 - Kachel-Pipeline mit Wachhund: unbeantwortete Worker-Jobs werden erkannt und einmal neu gestellt, nach sechs Verlusten dauerhafter Wechsel auf den synchronen Pfad; Prioritäten werden jedes Frame nachgeführt
 - **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kamera-Freiflug wird über die Positionsdifferenz/Verschiebung des Ankerkörpers mitgeführt (nicht über v · dt). Der Kern liegt isoliert und three-frei in `src/nav/`. Gleit-Modus (`?feel=glide:1`): Pinch steuert Schub und Bremsen mit Bremsraste und framerate-unabhängigem Abklingen; die Flugrichtung folgt dem Blick verzögert. Automatisches Tempo (v0.4.11): Kontaktzeit-Begrenzer drosselt die Anflugsgeschwindigkeit sanft vor dem Aufprall (`ttcMin = 0,6 s`); Stufen-Rückführung führt die wählbare Geschwindigkeitsstufe beim Entfernen vom Ort des Setzens einseitig auf ×1 zurück (`stageHalfDecades = 1`). Beide Funktionen sind per `?feel=autoPace:0` abschaltbar.
-- **Verschachtelte Bezugsrahmen (Stufe 2):** Hierarchischer Bezugsrahmen-Baum (`FrameNode` in `src/frames/`). Jedes System, jeder Stern und jeder Planet besitzt einen eigenen lokalen Bezugsrahmen. Kamera hängt sich bei Überschreiten der Gravitationsdominanz (SOI-Radius mit 15 % Hysterese) automatisch um. Körperpositionen und Kepler-Propagation werden lokal im eigenen Bezugsrahmen gerechnet.
 - Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, über den Planetenrand hinaus läuft die Umrundung stetig weiter; im Freiflug dreht das Bild nie um seine Mitte — außer beim Zwei-Finger-Drehen (ab 20°, mit Pinch-Sperre und Dominanzprüfung, seit v0.4.8). Alle Gefühlswerte liegen isoliert in `nav/feel.ts` und sind live per URL (`?feel=...`) überschreibbar. Seit v0.4.6 ist `SpaceCamera.ts` unter den Dateideckel geteilt (`cameraTouch.ts` three-frei, `cameraPlacement.ts`). Seit v0.4.13 ist `Engine.ts` unter den Dateideckel geteilt (`EngineHud.ts`, `EngineInput.ts`).
 - Adaptive Renderauflösung (0,7×–2×)
 - Laufzeit-Selbsttest in `Engine`: warnt, wenn die Kamera ohne Schub von ihrem Anker wegdriftet — diagnostiziert Verwechslungen von `dtReal` und `dtSim`
 - Agent-Betrieb: `AGENTS.md`, CI auf jedem PR, Vertragskarte mit Invarianten-Prüfung, Aufgabenwarteschlange in `docs/aufgaben/` (§8, §12)
 
 **Fehlt strukturell** (nicht „noch nicht gebaut", sondern „blockiert Weiteres"):
-- Ein einziger Weltursprung. f64 löst bei 1 Lj nur noch ~2 m auf, bei 16 Lj ~30 m (§3.1). Sterne darzustellen trägt damit bis ~10³ Lj — bodennaher Flug ist aber schon auf Planeten der prozeduralen Nachbarsysteme nicht mehr sauber. Der Effekt ist vermessen, nicht nur hergeleitet: dasselbe Sonnensystem 3 Lj vom Ursprung verliert ~0,16 m/s Weltgeschwindigkeit allein durch Rundung (`tools/test-orbit.ts`). Genau das behebt Stufe 2
+- Ein einziger Weltursprung. f64 löst bei 1 Lj nur noch ~2 m auf, bei 16 Lj ~30 m (§3.1). Sterne darzustellen trägt damit bis ~10³ Lj — bodennaher Flug ist aber schon auf Planeten der prozeduralen Nachbarsysteme nicht mehr sauber. Der Effekt ist vermessen, nicht nur hergeleitet: dasselbe Sonnensystem 3 Lj vom Ursprung verliert ~0,16 m/s Weltgeschwindigkeit allein durch Rundung (`tools/test-orbit.ts`). Genau das behebt Stufe 2. Stand: Frame-Baum (2a) und Kamera-Umhängen (2b) existieren als Code und Tests, sind zur Laufzeit aber nicht verdrahtet — die Kamera bekommt nie einen Rahmen, die Körper rechnen absolut. Ein erster Versuch von 2c ist zurückgenommen (§9); Fundament dafür ist Aufgabe 22
 - Keine physikalische Photometrie ⇒ Helligkeiten sind kalibriert-geraten, nicht gerechnet
 - Kein Punktwolken- und kein Volumen-Renderer
 
@@ -181,7 +180,7 @@ Freier Flug mit Geschwindigkeit ∝ Distanz zum nächsten Körper; „Goto" als 
 *Abgenommen:* Flug von der Erdoberfläche zum Mond ohne Zielauswahl, jeder Zielwechsel als sichtbarer Flug.
 *Gelernt:* Geschwindigkeit wird ankerrelativ gespeichert, nicht als Weltgeschwindigkeit — sonst verliert die Kamera unter Time-Warp ihren Zielplaneten. Die Referenzhöhe entsteht aus einem gewichteten Boltzmann-Mittel im Log-Raum („Softmin"), nicht aus `logsumexp`; daraus folgt eine Flugzeit, die logarithmisch mit der Referenzhöhe skaliert — skalenfreier Flug. Picking läuft im Winkelraum, nicht im Pixelraum. *Aus v0.4:* Orientierung als Quaternion statt `theta/phi` (sonst Polanschlag und verzerrte Diagonalen); jeder Deckel pro Frame braucht einen Deckel pro Sekunde; wer einen asynchronen Platz belegt, muss ihn auch freigeben, wenn nie eine Antwort kommt. Alle drei v0.4-Fehler waren offline reproduzierbar — sie wurden nur nicht gesucht, weil die Tests ausschließlich bei 60 fps liefen.
 
-**Stufe 2 — Verschachtelte Bezugsrahmen** ✅ *erledigt in v0.5.0*
+**Stufe 2 — Verschachtelte Bezugsrahmen**
 Frame-Baum mit lokalen Ursprüngen; Kamera wird beim Überschreiten von Schwellen umgehängt. Alle Positionen werden relativ zum aktuellen Frame aufgelöst.
 *Fertig, wenn:* eine Sternposition in 100.000 Lj und ein Fels auf der Erde im selben Programmlauf beide korrekt sind — nachweisbar über einen Offline-Test, der Positionen über mehere Frame-Wechsel hin- und zurückrechnet.
 *Risiko:* invasivster Umbau; `SceneManager`, `CelestialBody`, `SpaceCamera`, `UniverseManager` sind betroffen.
@@ -310,10 +309,13 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
   2. *Wer einen asynchronen Platz belegt, gibt ihn auch frei, wenn die Antwort nie kommt* (Fehler 2 aus v0.4). Kandidat für eine Ergänzung von §4.5; der Fallback aus §8.3.6 gilt damit für den Worker-Pool genauso wie für den GPU-Kernel.
   3. *Bewegte Bezugskörper werden über ihre Positionsdifferenz mitgeführt, nie über v · dt — sonst ist es ein Euler-Schritt auf einer gekrümmten Bahn.* Dazu: Tests zur Mitführung brauchen gekrümmte Bahnen; geradlinige Bewegung beweist nichts.
 - **Noch nicht automatisierte Invarianten** (§8.3.3): keine f32-Weltkoordinaten (statisch schwer — Kandidat: Laufzeit-Assertion im `SceneManager`), Seed-Determinismus (Kandidat: Hash über ein prozedurales System in einem Offline-Test).
-- **Abstandsvergleiche über Bezugsrahmen** (Befund aus Aufgabe 21): *Ein Abstand zwischen zwei Größen ist nur gültig, wenn beide im selben Frame stehen — jeder Vergleich mit `body.position` braucht den Frame des Körpers.* Kandidat für Kanon §4.
-- **Ankerträgheit bei eigenen Frames** (Befund aus Aufgabe 21): Planeten mit eigenem Frame haben `velocity = 0` in `CelestialBody`, `BodyRef.velocity` an den Navigator ist für sie also null. Prüfen, ob die Ankerträgheit beim Ankerwechsel (`trackFrameVelocity`) davon betroffen ist.
 - **Nordausrichtung der Kamera** — Zwei-Finger-Drehen umgesetzt (v0.4.7, Aufgabe 08): Der Roll bleibt, wie die Gesten ihn hinterlassen, lässt sich aber mit zwei Fingern ausdrücklich zurückdrehen (Totzone 8°, danach 1:1). Eine automatische Nivellierung gibt es weiterhin nicht. Offen bleibt nur, ob zusätzlich ein Knopf „Norden oben" gewünscht ist — Entscheidung des Inhabers.
 - **Aufgabentext gegen den Stand von `main`** (Befund aus Aufgabe 08): Die Aufgabe nannte `SpaceCamera.ts` (Ratsche 473) und Version 0.4.5. Seit Aufgabe 02 (v0.4.6) liegt die Gestenverdrahtung in `camera/cameraTouch.ts`, `SpaceCamera.ts` hat keinen Ratscheneintrag mehr. Umgesetzt in `cameraTouch.ts` mit derselben Auflage (wächst nicht: 153 Zeilen), Version 0.4.7.
+- **Stufe 2c zurückgenommen** (v0.4.16; Befund aus Aufgabe 06 und 21): Nach dem Merge von v0.5.0 stand die Warteschlange sofort auf 96, ~12 fps; nach dem Fix v0.5.1 war die Warteschlange leer, aber nichts funktionierte. Drei Ursachen, im Browser mit dem Stand von `main` nachgemessen:
+  1. *Die Kamera hatte zur Laufzeit nie einen Rahmen.* `SpaceCamera.setFrame()` wird seit Aufgabe 05 nirgends aufgerufen; `tools/test-camera-frame.ts` rief es selbst und war deshalb grün. Das im PR von 05 versprochene `[Frame: …]` im HUD erschien nie.
+  2. *Fehlende Rahmen wurden still übersprungen* (`if (cameraFrame && body.frame && …)`). Seit 2c liegt jeder Körper bei (0,0,0) im eigenen Rahmen ⇒ ohne Umrechnung standen alle an einem Punkt (Sonne und Erde beide bei 3,82·10⁷ m vor der Kamera), vorher wurden aus demselben Grund alle 80 Nachbarsysteme bevölkert und alle 285 Gesteinsplaneten verfeinert.
+  3. *Der Navigator überlebt keinen Rahmenwechsel*: `updateFrame()` rechnet nur die Kameraposition um, der Merkpunkt der Mitführung bleibt im alten Rahmen.
+  Dazu: 06 änderte sieben Dateien unter `src/` ohne Eskalation (Grenze fünf). Folgerung: eine Umrechnungsstelle, die einen fehlenden Rahmen als Fehler meldet; ein Prüfstand über den ganzen Frame-Loop statt Tests der Einzelteile; Laufzeit-Selbsttest „Rahmen fehlt" (Aufgabe 22); 06 wird danach neu geschnitten. Kanon-Kandidat: *Eine Umrechnung zwischen Rahmen darf nie still entfallen — fehlt ein Rahmen, ist das ein Fehler, kein Sonderfall.*
 - **Parameter-Properties** in `SpaceCamera`, `PlanetLOD`, `UniverseManager` (`constructor(private readonly …)`): Node-Type-Stripping kann sie nicht entfernen, die Dateien sind damit nicht offline ladbar. Erst umstellen, wenn ein Test sie braucht.
 
 ---
@@ -361,8 +363,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
 | v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Nachtrag: Entscheidung für Option B (hierarchisch nach SOI) am 19.10.2026 eingetragen. |
 | v0.4.15 | Stufe 2b (Aufgabe 05): Kamera hängt in Bezugsrahmen um (`SpaceCamera`, `SceneManager`). `updateActiveFrame` mit SOI-Radius und 15 % Hysterese in `src/frames/FrameTree.ts`. HUD-Anzeige des Kameraframes. 12 Offline-Tests in `tools/test-camera-frame.ts`. |
-| v0.5.0 | Stufe 2c (Aufgabe 06): Stufe 2 komplett. `CelestialBody` rechnet Position und Geschwindigkeit lokal im System-Frame. `UniverseManager` baut System-Frames für Katalog und prozedurale Sterne/Planeten. Frame-transformiertes Picking/Targeting in `EngineInput`, Orbitplatzierung/Surface-Clamping in `SpaceCamera` / `cameraPlacement`. 6 Offline-Tests in `tools/test-stage2.ts`. |
-| v0.5.1 | Fix nach Stufe 2c (Aufgabe 21): Frame-transformierte Kamerapositionen in `SceneManager.syncToCamera` und `UniverseManager.update` für abstandsabhängiges Terrain-LOD, Sternglows und prozedurales Bevölkern. 11 Offline-Tests in `tools/test-frame-distance.ts`. |
+| v0.4.16 | Rücknahme von Stufe 2c (v0.5.0, Aufgabe 06) und ihrem Fix (v0.5.1, Aufgabe 21): Code wieder auf dem Stand v0.4.15. Befund in §9 (Kamera ohne Rahmen, still übersprungene Umrechnung, Navigator beim Rahmenwechsel). Neue Aufgabe 22 als Fundament, Aufgaben 14–20 für Nebenspur B. |
 
 ---
 

@@ -171,18 +171,3 @@ export function transformPoint(p: Vec3, from: FrameNode, to: FrameNode): Vec3 {
 
   return add(p, totalOffset);
 }
-
-/**
- * Transformation der Kameraposition aus dem Kameraframe in den Frame eines Körpers.
- * Falls cameraFrame null ist (z.B. beim ersten Aufruf), wird defaultFrame verwendet.
- */
-export function cameraInBodyFrame(
-  cameraPos: Vec3,
-  cameraFrame: FrameNode | null | undefined,
-  bodyFrame: FrameNode | null | undefined,
-  defaultFrame: FrameNode,
-): Vec3 {
-  const from = cameraFrame ?? defaultFrame;
-  const to = bodyFrame ?? defaultFrame;
-  return transformPoint(cameraPos, from, to);
-}

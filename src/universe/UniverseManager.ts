@@ -4,9 +4,6 @@ import { Rng, hash32, hashString } from '../math/rng';
 import { Orbit, OrbitalElements } from '../physics/Kepler';
 import type { SceneManager } from '../core/SceneManager';
 import type { TerrainParams } from '../terrain/tileGeometry';
-import type { FrameNode } from '../frames/types';
-import { attachFrame, cameraInBodyFrame, computeSoiRadius, createFrame } from '../frames/FrameTree';
-import { vec3 } from '../nav/vec';
 import { CelestialBody } from './CelestialBody';
 import { Star } from './Star';
 import { Planet } from './Planet';
@@ -66,29 +63,19 @@ export class UniverseManager {
   private readonly roots: CelestialBody[] = [];
   private readonly proceduralStars: Star[] = [];
 
-  readonly universeFrame: FrameNode = createFrame('universe', 'Universum', vec3(0, 0, 0));
-  readonly galaxyFrame: FrameNode = createFrame('galaxy', 'Milchstraße', vec3(0, 0, 0));
-
-  constructor(private readonly sceneManager: SceneManager) {
-    attachFrame(this.galaxyFrame, this.universeFrame);
-  }
+  constructor(private readonly sceneManager: SceneManager) {}
 
   // ---------------------------------------------------------------- Katalog
 
   loadCatalog(): void {
-    const solFrame = createFrame('sol', 'Sonnensystem', vec3(0, 0, 0), 1.03 * LY);
-    attachFrame(solFrame, this.galaxyFrame);
-
-    const root = this.buildFromDef(catalogData as CatalogBodyDef, null, solFrame);
+    const root = this.buildFromDef(catalogData as CatalogBodyDef, null);
     this.roots.push(root);
     this.sceneManager.addSystem(root);
   }
 
-  private buildFromDef(def: CatalogBodyDef, parent: CelestialBody | null, parentFrame: FrameNode): CelestialBody {
+  private buildFromDef(def: CatalogBodyDef, parent: CelestialBody | null): CelestialBody {
     const seed = hashString(def.name);
     let body: CelestialBody;
-
-    let bodyFrame: FrameNode = parentFrame;
 
     if (def.type === 'star') {
       body = new Star({
@@ -96,23 +83,12 @@ export class UniverseManager {
         temperature: def.temperature ?? 5772,
         luminosity: def.luminosity ?? 3.828e26,
       });
-      body.frame = parentFrame;
     } else {
       body = new Planet({
         name: def.name, type: def.type, mass: def.mass, radius: def.radius, seed,
         terrain: def.type === 'rocky' ? { ...TERRAIN_DEFAULTS, ...def.terrain } : undefined,
         gasPalette: def.gasPalette,
       });
-
-      if (def.orbit && parent) {
-        const a = def.orbit.a_au * AU;
-        const soi = computeSoiRadius(a, def.mass, parent.mass);
-        bodyFrame = createFrame(`f-${def.name}`, def.name, vec3(0, 0, 0), soi);
-        attachFrame(bodyFrame, parentFrame);
-        body.frame = bodyFrame;
-      } else {
-        body.frame = parentFrame;
-      }
     }
 
     if (parent && def.orbit) {
@@ -129,7 +105,7 @@ export class UniverseManager {
       body.attachTo(parent, new Orbit(elements, parent.mass));
     }
 
-    for (const childDef of def.children ?? []) this.buildFromDef(childDef, body, bodyFrame);
+    for (const childDef of def.children ?? []) this.buildFromDef(childDef, body);
     return body;
   }
 
@@ -153,17 +129,13 @@ export class UniverseManager {
           if (px * px + py * py + pz * pz > radius * radius) continue;
 
           const p = generateStar(rng);
-          const starName = `PSC-${seed.toString(36).slice(0, 5).toUpperCase()}`;
-          const sysFrame = createFrame(`f-${starName}`, starName, vec3(px, py, pz), 1.03 * LY);
-          attachFrame(sysFrame, this.galaxyFrame);
-
           const star = new Star({
-            name: starName,
+            name: `PSC-${seed.toString(36).slice(0, 5).toUpperCase()}`,
             type: 'star', seed,
             mass: p.mass, radius: p.radius,
             temperature: p.temperature, luminosity: p.luminosity,
           });
-          star.frame = sysFrame;
+          star.position.set(px, py, pz); // statische galaktische Position der Wurzel
           star.systemSeed = hash32(seed, 0xbeef);
           star.populated = false;
 
@@ -186,19 +158,13 @@ export class UniverseManager {
       luminosity: body.luminosity, temperature: body.temperature,
     }, rng);
 
-    const parentFrame = body.frame ?? this.galaxyFrame;
     for (const d of defs) {
-      const soi = computeSoiRadius(d.elements.a, d.mass, body.mass);
-      const planetFrame = createFrame(`f-${d.name}`, d.name, vec3(0, 0, 0), soi);
-      attachFrame(planetFrame, parentFrame);
-
       const planet = new Planet({
         name: d.name, type: d.type, mass: d.mass, radius: d.radius,
         seed: hash32(body.systemSeed, d.name.length, Math.round(d.elements.a / 1e6)),
         terrain: d.terrain ?? undefined,
         gasPalette: d.gasPalette,
       });
-      planet.frame = planetFrame;
       planet.attachTo(body, new Orbit(d.elements, body.mass));
       this.sceneManager.addBody(planet);
     }
@@ -207,18 +173,10 @@ export class UniverseManager {
   // ------------------------------------------------------------------ Tick
 
   /** Propagiert alle Systeme und triggert Lazy-Instanziierung bei Annäherung. */
-  update(simTime: number, cameraPos: Vector3d, cameraFrame?: FrameNode | null): void {
-    const camPosVec3 = { x: cameraPos.x, y: cameraPos.y, z: cameraPos.z };
+  update(simTime: number, cameraPos: Vector3d): void {
     for (const star of this.proceduralStars) {
-      if (!star.populated) {
-        const camInStar = cameraInBodyFrame(camPosVec3, cameraFrame, star.frame, this.galaxyFrame);
-        const dx = star.position.x - camInStar.x;
-        const dy = star.position.y - camInStar.y;
-        const dz = star.position.z - camInStar.z;
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (dist < POPULATE_DISTANCE) {
-          this.populateSystem(star);
-        }
+      if (!star.populated && cameraPos.distanceTo(star.position) < POPULATE_DISTANCE) {
+        this.populateSystem(star);
       }
     }
     for (const root of this.roots) root.updateHierarchy(simTime);
