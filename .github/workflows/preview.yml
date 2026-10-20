@@ -16,8 +16,10 @@ permissions:
   contents: write
   pull-requests: write
 
+# Pro PR eine eigene Gruppe: beim Merge zeigt github.ref des PR-Laufs auf main und würde sonst
+# den Deploy von main abbrechen
 concurrency:
-  group: preview-${{ github.ref }}
+  group: preview-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
