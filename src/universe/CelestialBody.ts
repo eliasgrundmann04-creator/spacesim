@@ -79,10 +79,25 @@ export abstract class CelestialBody {
   updateHierarchy(simTime: number): void {
     if (this.orbit && this.parent) {
       this.orbit.getStateAtTime(simTime, _local, _localVel);
-      this.position.addVectors(this.parent.position, _local);
-      this.velocity.addVectors(this.parent.velocity, _localVel);
+      if (this.frame && this.parent.frame && this.frame !== this.parent.frame) {
+        // Körper hat seinen eigenen Bezugsrahmen (z.B. Planet mit eigenem Frame in einem Stern-Frame).
+        // Der Ursprung des Frames liegt auf dem Körper ⇒ lokale Position und v im eigenen Frame sind (0,0,0).
+        this.position.set(0, 0, 0);
+        this.velocity.set(0, 0, 0);
+        this.frame.position = { x: _local.x, y: _local.y, z: _local.z };
+      } else {
+        // Körper teilt den Bezugsrahmen mit dem Elternkörper (z.B. Mond im Planeten-Frame oder Planeten ohne eigenen Frame)
+        this.position.addVectors(this.parent.position, _local);
+        this.velocity.addVectors(this.parent.velocity, _localVel);
+      }
+    } else {
+      // Wurzelkörper (Sterne oder sonstige Systemzentren):
+      // Falls sie einen Frame haben, ist ihre lokale Position (0,0,0) und v = (0,0,0).
+      if (this.frame) {
+        this.position.set(0, 0, 0);
+        this.velocity.set(0, 0, 0);
+      }
     }
-    // Wurzelkörper (Sterne) behalten ihre statische galaktische Position und v = 0.
     for (const child of this.children) child.updateHierarchy(simTime);
   }
 

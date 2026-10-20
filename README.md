@@ -1,7 +1,9 @@
-# Space Sim — Navigation (v0.4.1)
+# Space Sim — Navigation (v0.5.0)
 
 Physikalisch realistischer Weltraumsimulator (SpaceEngine-Stil).
 TypeScript · Three.js (WebGPU-Renderer, `three/webgpu`) · Vite.
+
+**Neu in v0.5 — Stufe 2 „Verschachtelte Bezugsrahmen" komplett.** Jedes System, jeder Stern und jeder Planet besitzt nun seinen eigenen lokalen Bezugsrahmen (`FrameNode`). Körperpositionen und Kepler-Propagation werden lokal im jeweiligen System-Frame gerechnet. Dadurch sind Sternpositionen in 100.000 Lj und ein Fels auf der Erdoberfläche im selben Programmlauf ohne Präzisionsverlust möglich (`tools/test-stage2.ts`), und Bahngeschwindigkeiten ferner Systeme weisen bei 3 Lj keinen f64-Rundungsverlust mehr auf (`tools/test-orbit.ts`).
 
 **Neu in v0.4.1 — Umzug auf Agent-Betrieb.** Das Repo enthält jetzt den Quellbaum statt eines ZIPs. Agenten arbeiten nach [`AGENTS.md`](AGENTS.md), Aufgaben stehen in [`docs/aufgaben/`](docs/aufgaben/), der Leitfaden in [`docs/leitfaden.md`](docs/leitfaden.md). `npm run check` bündelt Typecheck, alle Tests, Vertragskarte ([`docs/contracts.md`](docs/contracts.md)) und Produktionsbuild und läuft in der CI auf jedem PR. Nebenbei behoben: drei Typfehler, die ohne `node_modules` unsichtbar blieben und `npm run build` scheitern ließen, und Testskripte, die unter Node 22.6–22.17 gar nicht starteten.
 
