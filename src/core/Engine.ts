@@ -13,10 +13,10 @@ import { FlightControls } from '../ui/FlightControls';
 import { EngineHud, readBackendChoice, buildProbe } from './EngineHud';
 import { EngineInput, toVec } from './EngineInput';
 import { FrameStats } from '../perf/frameStats';
+import { EngineBench, parseBenchParam } from './EngineBench';
 
 /**
- * Engine: verdrahtet Renderer, Uhr, Universum, Szene und Kamera
- * und besitzt die Main-Loop.
+ * Engine: verdrahtet Renderer, Uhr, Universum, Szene und Kamera und besitzt die Main-Loop.
  */
 export class Engine {
   private renderer!: THREE.WebGPURenderer;
@@ -27,27 +27,22 @@ export class Engine {
   private readonly terrain = getTerrainProvider();
   private readonly stats = new FrameStats();
 
-  // Navigation (Stufe 1)
   private readonly navigator = new Navigator();
   private flightControls!: FlightControls;
   private nav: NavResult | null = null;
   private gotoUid: string | null = null;
   private drift = { uid: '', altitude: 0, frames: 0, warned: false };
 
-  // Subsysteme (HUD & Input)
   private hudHandler!: EngineHud;
   private inputHandler!: EngineInput;
+  private benchHandler: EngineBench | null = null;
 
-  // Adaptive Renderauflösung (Tablets sind fast immer fillrate-limitiert)
   private maxPixelRatio = 1;
   private renderScale = 1;
   private smoothedFrameMs = 16;
   private lastScaleChange = 0;
 
-  private constructor(
-    private readonly container: HTMLElement,
-    hud: HTMLElement,
-  ) {
+  private constructor(private readonly container: HTMLElement, hud: HTMLElement) {
     this.hudHandler = new EngineHud(hud);
     this.inputHandler = new EngineInput({
       getCamera: () => this.camera,
@@ -69,16 +64,14 @@ export class Engine {
   }
 
   private async init(): Promise<void> {
-    if (!('gpu' in navigator)) {
-      console.info('[Engine] WebGPU nicht verfügbar — WebGPURenderer nutzt den WebGL2-Fallback.');
-    }
+    if (!('gpu' in navigator)) console.info('[Engine] WebGPU nicht verfügbar — WebGPURenderer nutzt WebGL2-Fallback.');
 
-    const rendererParams = { antialias: true, logarithmicDepthBuffer: true };
-    this.renderer = new THREE.WebGPURenderer(rendererParams as never);
+    this.renderer = new THREE.WebGPURenderer({ antialias: true, logarithmicDepthBuffer: true } as never);
     await this.renderer.init();
 
+    const benchOpt = parseBenchParam();
     this.maxPixelRatio = Math.min(window.devicePixelRatio, 2);
-    this.renderScale = this.maxPixelRatio;
+    this.renderScale = benchOpt.active ? benchOpt.scale : this.maxPixelRatio;
     this.renderer.setPixelRatio(this.renderScale);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -104,6 +97,12 @@ export class Engine {
       this.camera.focus(start);
     }
 
+    if (benchOpt.active) {
+      this.benchHandler = new EngineBench(
+        this.camera, this.clock, () => this.universe, this.terrain, this.stats, this.renderScale,
+      );
+    }
+
     this.flightControls = new FlightControls({
       container: document.getElementById('flight') ?? this.container,
       canvas: this.renderer.domElement,
@@ -116,7 +115,6 @@ export class Engine {
     window.addEventListener('orientationchange', () => this.onResize());
 
     (window as unknown as { engine: Engine }).engine = this;
-
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
@@ -125,15 +123,6 @@ export class Engine {
     this.stats.beginFrame(now);
 
     const dt = this.clock.tick();
-
-    // Frame-Choreografie:
-    // 1. universe.update
-    // 2. Orientierung
-    // 3. stepNavigation
-    // 4. Kameraplatzierung
-    // 5. syncToCamera
-    // 6. pump
-    // 7. render
     this.universe.update(this.clock.simTime, this.camera.worldPosition);
     this.stats.mark(0);
 
@@ -159,6 +148,8 @@ export class Engine {
 
     this.stats.endFrame(performance.now(), this.renderer.info);
 
+    if (this.benchHandler) this.benchHandler.step(now);
+
     this.hudHandler.update({
       clock: this.clock,
       smoothedFrameMs: this.smoothedFrameMs,
@@ -172,6 +163,7 @@ export class Engine {
   }
 
   private adaptResolution(dt: number): void {
+    if (this.benchHandler) return;
     this.smoothedFrameMs += (dt * 1000 - this.smoothedFrameMs) * 0.05;
     const now = performance.now();
     if (now - this.lastScaleChange < 2500) return;
@@ -259,11 +251,7 @@ export class Engine {
 
     if (this.drift.frames >= 30) {
       this.drift.warned = true;
-      console.warn(
-        '[Engine] Freiflug driftet ohne Schub vom Ankerkörper weg. Fast immer dieselbe ' +
-        'Ursache: BodyRef.velocity ist nicht mit dem Time-Warp-Faktor multipliziert — ' +
-        'Kepler liefert m pro Simsekunde, der Navigator erwartet m pro Realsekunde.',
-      );
+      console.warn('[Engine] Freiflug driftet ohne Schub vom Ankerkörper weg.');
     }
   }
 

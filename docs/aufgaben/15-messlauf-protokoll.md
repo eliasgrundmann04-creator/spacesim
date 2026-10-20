@@ -1,7 +1,7 @@
 ---
 id: 15
 titel: Nebenspur B2 — Messlauf (?bench) und Leistungsprotokoll
-status: offen
+status: erledigt
 braucht: [14]
 stufe: B (Performance & Tablet)
 tablet: ja

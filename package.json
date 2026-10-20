@@ -1,14 +1,14 @@
 {
   "name": "space-sim",
   "private": true,
-  "version": "0.4.17",
+  "version": "0.4.18",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput && npm run test:perf",
+    "test": "npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput && npm run test:perf && npm run test:bench",
     "test:frames": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts",
     "test:camera-frame": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-camera-frame.ts",
     "test:warp": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts",
@@ -21,6 +21,7 @@
     "test:feel": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-feel.ts",
     "test:throughput": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts",
     "test:perf": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-perf.ts",
+    "test:bench": "node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-bench.ts",
     "contracts": "node tools/contracts.mjs",
     "check": "npm run typecheck && npm test && node tools/contracts.mjs --check && vite build"
   },

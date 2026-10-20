@@ -11,7 +11,8 @@
 | `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, frames/FrameTree, frames/types, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
 | `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
-| `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, perf/frameStats, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
+| `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineBench, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, perf/frameStats, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
+| `core/EngineBench.ts` | direkt |  |  | camera/SpaceCamera, core/SimClock, package.json, perf/benchRoute, perf/frameStats, terrain/TerrainProvider, universe/UniverseManager |
 | `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, perf/frameStats, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
 | `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | frames/FrameTree, frames/types, math/Vector3d, universe/CelestialBody |
@@ -37,6 +38,7 @@
 | `nav/proximity.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/types.ts` | — | ✓ |  | nav/vec |
 | `nav/vec.ts` | — | ✓ |  |  |
+| `perf/benchRoute.ts` | — | ✓ |  |  |
 | `perf/frameStats.ts` | — | ✓ |  |  |
 | `physics/Kepler.ts` | über math/Vector3d |  |  | core/constants, math/Vector3d |
 | `terrain/PlanetLOD.ts` | direkt |  |  | terrain/TerrainProvider, terrain/tileGeometry |
@@ -59,7 +61,7 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput && npm run test:perf`
+- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput && npm run test:perf && npm run test:bench`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
 - `npm run test:camera-frame` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-camera-frame.ts`
 - `npm run test:warp` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts`
@@ -72,6 +74,7 @@
 - `npm run test:feel` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-feel.ts`
 - `npm run test:throughput` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-throughput.ts`
 - `npm run test:perf` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-perf.ts`
+- `npm run test:bench` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-bench.ts`
 - `npm run contracts` — `node tools/contracts.mjs`
 - `npm run check` — `npm run typecheck && npm test && node tools/contracts.mjs --check && vite build`
 
@@ -126,6 +129,14 @@
 
 - `class Engine`
   - `static async create(container: HTMLElement, hud: HTMLElement): Promise<Engine>`
+
+### `core/EngineBench.ts`
+
+- `function parseBenchParam(search: string = typeof window !== 'undefined' ? window.location.search : ''): { active: boolean; scale: number }`
+- `class EngineBench`
+  - `readonly renderScale: number`
+  - `constructor(private readonly camera: SpaceCamera, private readonly clock: SimClock, private readonly getUniverse: () => UniverseManager, private readonly terrain: TerrainProvider, private readonly stats: FrameStats, renderScale = 1.0)`
+  - `step(nowMs: number): void`
 
 ### `core/EngineHud.ts`
 
@@ -437,6 +448,26 @@
 - `function slerpDir(a: Vec3, b: Vec3, t: number): Vec3`
 - `function slerpDirDerivative(a: Vec3, b: Vec3, t: number): Vec3`
 - `function relaxFactor(dt: number, tau: number): number`
+
+### `perf/benchRoute.ts`
+
+- `interface BenchStop { id, name, location, targetBodyName, mode, altitudeOrDistance, pitchDeg?, isLand?, customRelativePos?, customLookTarget? }`
+- `const BENCH_STOPS: readonly BenchStop[]`
+- `type BenchPhase`
+- `interface BenchMetrics { dtP50Ms, dtP95Ms, dtMaxMs, cpuP95Ms, stutters, drawCalls, triangles, geometries }`
+- `interface BenchStopResult { stop, settleText, metrics }`
+- `interface BenchState { stopIndex, phase, phaseTime, settleTime, settleText, totalTime, results }`
+- `const SETTLE_TIMEOUT_SEC`
+- `const MEASURE_DURATION_SEC`
+- `interface StepBenchOptions { dtSec, pendingQueue, getMetricsForCurrentStop? }`
+- `function createInitialBenchState(): BenchState`
+- `function stepBenchStateMachine(state: BenchState, options: StepBenchOptions): { nextState: BenchState; action?: 'transition_stop' | 'finish' }`
+- `function formatGermanNumber(val: number, decimals = 1): string`
+- `function formatTriangles(tri: number): string`
+- `function formatBenchRow(result: BenchStopResult): string`
+- `interface BenchMetadata { version, date, device, backend, renderScale }`
+- `const BENCH_TABLE_HEADER`
+- `function formatBenchReport(meta: BenchMetadata, results: BenchStopResult[]): string`
 
 ### `perf/frameStats.ts`
 
