@@ -12,7 +12,7 @@
 | `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
 | `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
 | `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineBench, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, perf/frameStats, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
-| `core/EngineBench.ts` | direkt |  |  | camera/SpaceCamera, core/SimClock, package.json, perf/benchRoute, perf/frameStats, terrain/TerrainProvider, universe/UniverseManager |
+| `core/EngineBench.ts` | direkt |  |  | camera/SpaceCamera, core/SimClock, nav/vec, package.json, perf/benchRoute, perf/frameStats, terrain/TerrainProvider, universe/CelestialBody, universe/UniverseManager |
 | `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, perf/frameStats, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
 | `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | frames/FrameTree, frames/types, math/Vector3d, universe/CelestialBody |
@@ -38,7 +38,7 @@
 | `nav/proximity.ts` | — | ✓ |  | nav/types, nav/vec |
 | `nav/types.ts` | — | ✓ |  | nav/vec |
 | `nav/vec.ts` | — | ✓ |  |  |
-| `perf/benchRoute.ts` | — | ✓ |  |  |
+| `perf/benchRoute.ts` | — | ✓ |  | core/constants, nav/vec, perf/frameStats |
 | `perf/frameStats.ts` | — | ✓ |  |  |
 | `physics/Kepler.ts` | über math/Vector3d |  |  | core/constants, math/Vector3d |
 | `terrain/PlanetLOD.ts` | direkt |  |  | terrain/TerrainProvider, terrain/tileGeometry |
@@ -133,10 +133,11 @@
 ### `core/EngineBench.ts`
 
 - `function parseBenchParam(search: string = typeof window !== 'undefined' ? window.location.search : ''): { active: boolean; scale: number }`
+- `interface BenchDeps { camera, clock, getUniverse, terrain, resetMotion, backend, renderScale }`
 - `class EngineBench`
   - `readonly renderScale: number`
-  - `constructor(private readonly camera: SpaceCamera, private readonly clock: SimClock, private readonly getUniverse: () => UniverseManager, private readonly terrain: TerrainProvider, private readonly stats: FrameStats, renderScale = 1.0)`
-  - `step(nowMs: number): void`
+  - `constructor(deps: BenchDeps)`
+  - `step(frameStartMs: number, cpuMs: number, info: RendererInfoLike): void`
 
 ### `core/EngineHud.ts`
 
@@ -451,7 +452,10 @@
 
 ### `perf/benchRoute.ts`
 
-- `interface BenchStop { id, name, location, targetBodyName, mode, altitudeOrDistance, pitchDeg?, isLand?, customRelativePos?, customLookTarget? }`
+- `interface BenchStop { id, name, location, body, kind, distance, radial?, pitchDeg?, offset?, lookAt? }`
+- `const BENCH_LAND_DIR: Vec3`
+- `const BENCH_SIM_TIME`
+- `function createBenchRoute(): BenchStop[]`
 - `const BENCH_STOPS: readonly BenchStop[]`
 - `type BenchPhase`
 - `interface BenchMetrics { dtP50Ms, dtP95Ms, dtMaxMs, cpuP95Ms, stutters, drawCalls, triangles, geometries }`
@@ -462,6 +466,11 @@
 - `interface StepBenchOptions { dtSec, pendingQueue, getMetricsForCurrentStop? }`
 - `function createInitialBenchState(): BenchState`
 - `function stepBenchStateMachine(state: BenchState, options: StepBenchOptions): { nextState: BenchState; action?: 'transition_stop' | 'finish' }`
+- `class BenchSampler`
+  - `get count(): number`
+  - `reset(): void`
+  - `add(dtMs: number, cpuMs: number, drawCalls: number, triangles: number, geometries: number): void`
+  - `summarize(): BenchMetrics`
 - `function formatGermanNumber(val: number, decimals = 1): string`
 - `function formatTriangles(tri: number): string`
 - `function formatBenchRow(result: BenchStopResult): string`

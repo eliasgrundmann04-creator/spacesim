@@ -98,9 +98,15 @@ export class Engine {
     }
 
     if (benchOpt.active) {
-      this.benchHandler = new EngineBench(
-        this.camera, this.clock, () => this.universe, this.terrain, this.stats, this.renderScale,
-      );
+      this.benchHandler = new EngineBench({
+        camera: this.camera,
+        clock: this.clock,
+        getUniverse: () => this.universe,
+        terrain: this.terrain,
+        resetMotion: (b) => this.navigator.resetMotion(b && this.inputHandler.bodyRef(b)),
+        backend: 'isWebGPUBackend' in this.renderer.backend ? 'WebGPU' : 'WebGL2',
+        renderScale: this.renderScale,
+      });
     }
 
     this.flightControls = new FlightControls({
@@ -146,9 +152,9 @@ export class Engine {
     this.renderer.render(this.sceneManager.scene, this.camera.camera);
     this.stats.mark(6);
 
-    this.stats.endFrame(performance.now(), this.renderer.info);
-
-    if (this.benchHandler) this.benchHandler.step(now);
+    const end = performance.now();
+    this.stats.endFrame(end, this.renderer.info);
+    if (this.benchHandler) this.benchHandler.step(now, end - now, this.renderer.info);
 
     this.hudHandler.update({
       clock: this.clock,
@@ -163,8 +169,8 @@ export class Engine {
   }
 
   private adaptResolution(dt: number): void {
-    if (this.benchHandler) return;
     this.smoothedFrameMs += (dt * 1000 - this.smoothedFrameMs) * 0.05;
+    if (this.benchHandler) return; // Messlauf: Auflösung eingefroren, fps-Anzeige läuft weiter
     const now = performance.now();
     if (now - this.lastScaleChange < 2500) return;
 

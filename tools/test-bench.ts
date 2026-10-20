@@ -1,10 +1,22 @@
 import {
+  BENCH_LAND_DIR,
+  BENCH_SIM_TIME,
   BENCH_STOPS,
+  BenchSampler,
   type BenchStopResult,
+  createBenchRoute,
   createInitialBenchState,
   formatBenchReport,
   stepBenchStateMachine,
 } from '../src/perf/benchRoute';
+import { FrameStats } from '../src/perf/frameStats';
+import { TerrainField } from '../src/terrain/tileGeometry';
+import type { TerrainParams } from '../src/terrain/tileGeometry';
+import { hashString } from '../src/math/rng';
+import { Orbit } from '../src/physics/Kepler';
+import { Vector3d } from '../src/math/Vector3d';
+import { AU, DEG } from '../src/core/constants';
+import catalog from '../src/data/catalog.json' with { type: 'json' };
 
 let passed = 0;
 const failures: string[] = [];
@@ -27,9 +39,99 @@ function testDeterminismus(): void {
   const names = BENCH_STOPS.map((s) => s.name);
   check('Halt-Namen 1 bis 6', names.join(', ') === 'Halt 1, Halt 2, Halt 3, Halt 4, Halt 5, Halt 6');
 
-  const routeA = BENCH_STOPS;
-  const routeB = BENCH_STOPS;
-  check('Route zweimal abgefragt bitgenau identisch', JSON.stringify(routeA) === JSON.stringify(routeB));
+  const routeA = createBenchRoute();
+  const routeB = createBenchRoute();
+  check(
+    'Route zweimal erzeugt bitgenau identisch (getrennte Objekte)',
+    routeA !== routeB && JSON.stringify(routeA) === JSON.stringify(routeB) && JSON.stringify(routeA) === JSON.stringify(BENCH_STOPS),
+  );
+  check('Simzeit zu Beginn fest (J2000.0)', BENCH_SIM_TIME === 0, `Simzeit ${BENCH_SIM_TIME} s`);
+  check('Halt 1 Orbit, Halt 2–6 Freiflug', BENCH_STOPS[0].kind === 'orbit' && BENCH_STOPS.slice(1).every((s) => s.kind !== 'orbit'));
+}
+
+interface CatalogDef { name: string; radius: number; mass: number; orbit?: Record<string, number>; terrain?: Partial<TerrainParams>; children?: CatalogDef[] }
+
+function findDef(def: CatalogDef, name: string, parent: CatalogDef | null = null): { def: CatalogDef; parent: CatalogDef | null } | null {
+  if (def.name === name) return { def, parent };
+  for (const c of def.children ?? []) {
+    const hit = findDef(c, name, def);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function testLandUndTag(): void {
+  console.log('\nTest 5: Halt 3 über Land, Oberflächenhalte auf der Tagseite');
+
+  const hit = findDef(catalog as CatalogDef, 'Erde');
+  const earth = hit?.def;
+  const o = earth?.orbit;
+  const parent = hit?.parent;
+  if (!earth || !o || !parent) {
+    check('Erde im Katalog', false);
+    return;
+  }
+  // Wie UniverseManager: TERRAIN_DEFAULTS (octaves 5) + Katalogwerte, Seed aus dem Namen
+  const terrain: TerrainParams = { amplitude: 0.003, frequency: 1.8, octaves: 5, ocean: false, oceanLevel: 0, palette: 'gray', maxDepth: 14, resolution: 16, ...earth.terrain };
+  const field = new TerrainField({ seed: hashString('Erde'), radius: earth.radius, terrain });
+  const d = BENCH_LAND_DIR;
+  const n = Math.hypot(d.x, d.y, d.z);
+  const raw = field.rawHeight(d.x / n, d.y / n, d.z / n);
+  check('Halt 3: Rohhöhe über dem Meeresspiegel', raw > field.oceanH + 100, `Höhe ${raw.toFixed(0)} m, Meeresspiegel ${field.oceanH.toFixed(0)} m`);
+
+  // Gegenprobe: die alte Richtung +x läge nicht auf flachem Land unter dem Sonnenstand
+  const rawX = field.rawHeight(1, 0, 0);
+
+  const orbit = new Orbit({
+    a: o.a_au * AU, e: o.e, i: o.i_deg * DEG, Omega: o.Omega_deg * DEG, omega: o.omega_deg * DEG, M0: o.M0_deg * DEG, epoch: 0,
+  }, parent.mass);
+  const pos = new Vector3d();
+  orbit.getStateAtTime(BENCH_SIM_TIME, pos);
+  const r = pos.length();
+  const cosSun = -(pos.x * d.x + pos.y * d.y + pos.z * d.z) / (r * n);
+  const cosSunX = -pos.x / r;
+  check(
+    'Landpunkt auf der Tagseite (Sonne > 60° über dem Horizont)',
+    cosSun > Math.sin(60 * DEG),
+    `Sonnenhöhe ${(90 - Math.acos(cosSun) / DEG).toFixed(1)}°; alte Richtung +x: ${(90 - Math.acos(cosSunX) / DEG).toFixed(1)}°, Höhe dort ${rawX.toFixed(0)} m`,
+  );
+}
+
+function testAuswertungJeFrame(): void {
+  console.log('\nTest 6: Auswertung aus Einzelframes (20, 60, 120 fps, je 5 s, 3 Ruckler)');
+
+  for (const fps of [20, 60, 120]) {
+    const base = 1000 / fps;
+    const sampler = new BenchSampler();
+    const stats = new FrameStats();
+    const rolling: number[] = [];
+    let naiveStutters = 0;
+    let t = 0;
+    const frames = Math.round(5 * fps);
+    for (let i = 0; i < frames; i++) {
+      const dt = i % Math.floor(frames / 3) === 7 ? base * 4 : base; // drei Ruckler, je 4 × Bildintervall
+      t += dt;
+      stats.beginFrame(t - 1);
+      stats.endFrame(t);
+      sampler.add(dt, 1, 10, 1000, 5);
+      const summary = stats.getSummary(t); // alter Weg: gleitende HUD-Zusammenfassung je Frame
+      rolling.push(summary.dtP50Ms);
+      naiveStutters += summary.stutters;
+    }
+    const m = sampler.summarize();
+    rolling.sort((a, b) => a - b);
+    const naiveP95 = rolling[Math.floor(rolling.length * 0.95)];
+    check(
+      `${fps} fps: Ruckler = 3, Bild max = 4 × Intervall`,
+      m.stutters === 3 && Math.abs(m.dtMaxMs - 4 * base) < 1e-9 && Math.abs(m.dtP50Ms - base) < 1e-9,
+      `p50 ${m.dtP50Ms.toFixed(2)} ms, max ${m.dtMaxMs.toFixed(2)} ms, Ruckler ${m.stutters}`,
+    );
+    check(
+      `${fps} fps: Gegenprobe — alter Weg glättet p95 und zählt Ruckler vielfach`,
+      Math.abs(naiveP95 - base) < 0.01 && m.dtMaxMs >= 4 * naiveP95 - 1e-6 && naiveStutters > 10 * m.stutters,
+      `alter Weg: p95 ${naiveP95.toFixed(2)} ms, Ruckler ${naiveStutters}`,
+    );
+  }
 }
 
 function testAblaufNachZeit(): void {
@@ -156,6 +258,8 @@ function main(): void {
   testAblaufNachZeit();
   testEinschwingen();
   testAusgabeFormatierung();
+  testLandUndTag();
+  testAuswertungJeFrame();
 
   console.log(`\n${passed} bestanden, ${failures.length} fehlgeschlagen`);
   if (failures.length) {

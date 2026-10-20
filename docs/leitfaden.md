@@ -24,12 +24,12 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.18)
+## 2. Aktueller Stand (v0.4.19)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 213 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz, 24 Performance/HUD, 14 Messlauf/?bench), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 223 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz, 24 Performance/HUD, 24 Messlauf/?bench), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
-- Automatisierter Messlauf (`?bench`) und Leistungsprotokoll in `docs/leistung.md`: fliegt eine feste Route über 6 Halte, misst Bild- und CPU-Zeiten, Kachel-Einschwingen und Rendermetriken, friert die adaptive Auflösung ein und erzeugt eine Markdown-Ergebniszeile (`src/perf/benchRoute.ts`, `src/core/EngineBench.ts`)
+- Automatisierter Messlauf (`?bench`) und Leistungsprotokoll in `docs/leistung.md`: springt eine feste Route über 6 Halte ab (Simzeit J2000.0, Oberflächenhalte auf der Tagseite, Halt 3 auf festem Landpunkt, Horizont waagerecht), misst Bild- und CPU-Zeit jedes einzelnen Frames, Kachel-Einschwingen und Rendermetriken, friert die adaptive Auflösung ein und erzeugt eine Markdown-Ergebniszeile (`src/perf/benchRoute.ts`, `src/core/EngineBench.ts`). Noch ohne Basiszeile vom Tablet
 - Messpunkte im HUD (CPU, Bildzeit-Perzentile p50/p95/max über 5 s Zeitfenster, Ruckler, Draw-Calls, Dreiecke, Geometrien; mit `?perf` Aufschlüsselung der 7 Loop-Phasen)
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
 - Floating Origin: f64-CPU-Positionen, Kamera immer bei (0,0,0)
@@ -318,6 +318,14 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
   2. *Fehlende Rahmen wurden still übersprungen* (`if (cameraFrame && body.frame && …)`). Seit 2c liegt jeder Körper bei (0,0,0) im eigenen Rahmen ⇒ ohne Umrechnung standen alle an einem Punkt (Sonne und Erde beide bei 3,82·10⁷ m vor der Kamera), vorher wurden aus demselben Grund alle 80 Nachbarsysteme bevölkert und alle 285 Gesteinsplaneten verfeinert.
   3. *Der Navigator überlebt keinen Rahmenwechsel*: `updateFrame()` rechnet nur die Kameraposition um, der Merkpunkt der Mitführung bleibt im alten Rahmen.
   Dazu: 06 änderte sieben Dateien unter `src/` ohne Eskalation (Grenze fünf). Folgerung: eine Umrechnungsstelle, die einen fehlenden Rahmen als Fehler meldet; ein Prüfstand über den ganzen Frame-Loop statt Tests der Einzelteile; Laufzeit-Selbsttest „Rahmen fehlt" (Aufgabe 22); 06 wird danach neu geschnitten. Kanon-Kandidat: *Eine Umrechnung zwischen Rahmen darf nie still entfallen — fehlt ein Rahmen, ist das ein Fehler, kein Sonderfall.*
+- **Messlauf v0.4.18 vorzeitig gemergt** (Befund aus Aufgabe 15, im Browser nachgemessen): Der Inhaber sah konstant 63 fps bei starkem Ruckeln, ab dem zweiten, dritten Bild den Blick durch die Erdkruste, und am Ende nur Sternenhimmel. Ursachen im Messlauf, behoben in v0.4.19:
+  1. *fps-Anzeige eingefroren:* `adaptResolution` kehrte im Messlauf vor der Glättung zurück, `smoothedFrameMs` blieb auf dem Startwert 16 ⇒ „63 fps".
+  2. *Messwerte geglättet:* je Frame wurde der gleitende 5-s-Median des HUD gespeichert statt des Bildintervalls; p95 und max zeigten dadurch nie einen Ruckler, die Ruckler-Spalte zählte dagegen jeden Ruckler einmal pro Frame im Fenster (Gegenprobe in `tools/test-bench.ts`: 579 statt 3 bei 60 fps).
+  3. *Blick nie gesetzt:* `lookTowards(…, 0.001)` dreht um 0,2 % — die Kamera schaute an jedem Halt weiter in die Richtung des ersten, an Halt 3 aus 2 m senkrecht in den Boden, an Halt 5/6 ins Leere.
+  4. *Halt 3 nicht auf Land:* `isLand` wurde nie ausgewertet; die Richtung +x lag auf einem 3,6-km-Gipfel nahe dem Terminator (Sonne 10° hoch).
+  5. *Navigator nicht zurückgesetzt:* am Mond trug die Mitführung die Rahmengeschwindigkeit der Erde ein, die Kamera driftete mit 258 m/s.
+  6. *Basiszeile in `docs/leistung.md` erfunden* (Datum vor dem Lauf, Gerät „Tablet / Desktop (Referenzlauf)"). Entfernt; die Basiszeile kommt aus dem ersten Tablet-Lauf.
+- **Kachel-Warteschlange verhungert nach einem Sprung an die Oberfläche** (Befund aus dem Messlauf, offen): In 2 m Höhe will der Quadtree 2.638 Kacheln, die Warteschlange fasst 96 und wirft die fernsten ab. Weil nach Kameradistanz sortiert wird, sind das genau die groben Kacheln der Gegenseite, ohne die keine Elternkachel auf ihre Kinder umschalten darf — sichtbar bleibt Stufe 1 (~400 km Kachelkante), die Warteschlange steht dauerhaft auf 96. Liegt die Kamera dabei in einem Tal oder an einem Hang, steckt sie in dieser groben Fläche: Blick durch die Kruste, Kachelkanten als Gitter, Sterne dahinter. Im normalen Flug fällt das kaum auf, weil die groben Stufen beim Annähern schon entstehen; der Messlauf springt und zeigt es an Halt 2–4 als Einschwingen „> 15 s". Gegenprobe: nur teilen, wenn die eigene Kachel schon Geometrie hat, behebt es *nicht* (nach 40 s weiter Stufe 1). Vorschlag für eine eigene Aufgabe (`PlanetLOD.ts`, `TerrainProvider.ts`): grob vor fein priorisieren (Stufe vor Distanz) und Abwürfe nicht sofort neu anfordern. Entscheidung des Inhabers, ob das vor Aufgabe 22 kommt.
 - **Parameter-Properties** in `SpaceCamera`, `PlanetLOD`, `UniverseManager` (`constructor(private readonly …)`): Node-Type-Stripping kann sie nicht entfernen, die Dateien sind damit nicht offline ladbar. Erst umstellen, wenn ein Test sie braucht.
 
 ---
@@ -369,6 +377,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.17 | Nebenspur B1 (Aufgabe 14): Messpunkte im HUD. Bildzeit-Perzentile (p50/p95/max) über 5 s Zeitfenster, CPU-Zeit, Ruckler, Draw-Calls, Dreiecke, Geometrien; mit `?perf` Phasen-Aufschlüsselung im Frame-Loop. Three-freier Kern `src/perf/frameStats.ts`, 24 Offline-Tests in `tools/test-perf.ts`. |
 | v0.4.18 | Nebenspur B2 (Aufgabe 15): Messlauf (`?bench`) und Leistungsprotokoll (`docs/leistung.md`). Vordefinierte Route über 6 Halte, automatischer Zustandsautomat (setup → settling → measuring), Ergebnisfeld mit Kopierknopf und 14 Offline-Tests in `tools/test-bench.ts`. |
 
+| v0.4.19 | Nacharbeit Aufgabe 15 (Messlauf): fps-Anzeige läuft im Messlauf weiter; Bild- und CPU-Zeit je Einzelframe statt gleitendem HUD-Median (`BenchSampler`); Blick an jedem Halt vollständig gesetzt, Horizont waagerecht, Blick nach Norden; Halt 3 auf festem Landpunkt (787 m, Sonne 75° hoch), alle Oberflächenhalte auf der Tagseite; Navigator je Halt zurückgesetzt; Backend aus dem Renderer statt aus `navigator.gpu`; erfundene Basiszeile aus `docs/leistung.md` entfernt. 24 Offline-Tests in `tools/test-bench.ts` (vorher 14). Befund „Kachel-Warteschlange verhungert" in §9 |
 ---
 
 ## 12. Aufgabenprotokoll
