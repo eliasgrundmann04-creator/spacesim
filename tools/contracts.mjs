@@ -24,6 +24,7 @@ const OUT = 'docs/contracts.md';
 const THREE_FREE = [
   'src/frames/',
   'src/nav/',
+  'src/perf/',
   'src/camera/cameraTouch.ts',
   'src/terrain/tileGeometry.ts',
   'src/terrain/noise.ts',
