@@ -59,8 +59,6 @@ export class SceneManager {
    * und ruft die Per-Frame-Hooks der Körper auf (LOD, Sprites …).
    */
   syncToCamera(cameraWorldPos: Vector3d, dt: number, cameraFrame?: FrameNode | null): void {
-    const camPosScratch = new Vector3d();
-
     for (const body of this.bodies) {
       let relX = body.position.x - cameraWorldPos.x;
       let relY = body.position.y - cameraWorldPos.y;
@@ -78,15 +76,7 @@ export class SceneManager {
       }
 
       body.root.position.set(relX, relY, relZ);
-
-      // Kameraposition im Frame des Körpers: body.position − (bodyInCamFrame − cameraWorldPos)
-      // = body.position − rel
-      camPosScratch.set(
-        body.position.x - relX,
-        body.position.y - relY,
-        body.position.z - relZ,
-      );
-      body.update(dt, camPosScratch);
+      body.update(dt, cameraWorldPos);
     }
   }
 }

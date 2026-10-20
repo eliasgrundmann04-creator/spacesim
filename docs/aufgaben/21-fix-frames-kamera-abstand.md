@@ -1,7 +1,7 @@
 ---
 id: 21
 titel: Fix — nach Stufe 2c rechnen Körper ihren Kameraabstand im falschen Bezugsrahmen
-status: erledigt
+status: offen
 braucht: [06]
 stufe: — (Fehler aus Stufe 2c)
 tablet: ja

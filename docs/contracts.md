@@ -58,9 +58,8 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:frame-distance && npm run test:stage2 && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:stage2 && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
-- `npm run test:frame-distance` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frame-distance.ts`
 - `npm run test:stage2` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-stage2.ts`
 - `npm run test:camera-frame` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-camera-frame.ts`
 - `npm run test:warp` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts`
@@ -205,7 +204,6 @@
 - `function attachFrame(child: FrameNode, parent: FrameNode | null): void`
 - `function findLCA(a: FrameNode, b: FrameNode): { lca: FrameNode; pathToLCAFromA: FrameNode[]; pathToLCAFromB: FrameNode[]; }`
 - `function transformPoint(p: Vec3, from: FrameNode, to: FrameNode): Vec3`
-- `function cameraInBodyFrame(cameraPos: Vec3, cameraFrame: FrameNode | null | undefined, bodyFrame: FrameNode | null | undefined, defaultFrame: FrameNode): Vec3`
 
 ### `frames/types.ts`
 
@@ -609,7 +607,7 @@
   - `loadCatalog(): void`
   - `generateNeighborhood(radius: number): void`
   - `populateSystem(body: CelestialBody): void`
-  - `update(simTime: number, cameraPos: Vector3d, cameraFrame?: FrameNode | null): void`
+  - `update(simTime: number, cameraPos: Vector3d): void`
   - `findBody(name: string): CelestialBody | null`
 
 ### `universe/procedural.ts`
