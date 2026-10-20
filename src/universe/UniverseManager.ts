@@ -5,7 +5,7 @@ import { Orbit, OrbitalElements } from '../physics/Kepler';
 import type { SceneManager } from '../core/SceneManager';
 import type { TerrainParams } from '../terrain/tileGeometry';
 import type { FrameNode } from '../frames/types';
-import { attachFrame, computeSoiRadius, createFrame } from '../frames/FrameTree';
+import { attachFrame, cameraInBodyFrame, computeSoiRadius, createFrame } from '../frames/FrameTree';
 import { vec3 } from '../nav/vec';
 import { CelestialBody } from './CelestialBody';
 import { Star } from './Star';
@@ -207,10 +207,18 @@ export class UniverseManager {
   // ------------------------------------------------------------------ Tick
 
   /** Propagiert alle Systeme und triggert Lazy-Instanziierung bei Annäherung. */
-  update(simTime: number, cameraPos: Vector3d): void {
+  update(simTime: number, cameraPos: Vector3d, cameraFrame?: FrameNode | null): void {
+    const camPosVec3 = { x: cameraPos.x, y: cameraPos.y, z: cameraPos.z };
     for (const star of this.proceduralStars) {
-      if (!star.populated && cameraPos.distanceTo(star.position) < POPULATE_DISTANCE) {
-        this.populateSystem(star);
+      if (!star.populated) {
+        const camInStar = cameraInBodyFrame(camPosVec3, cameraFrame, star.frame, this.galaxyFrame);
+        const dx = star.position.x - camInStar.x;
+        const dy = star.position.y - camInStar.y;
+        const dz = star.position.z - camInStar.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < POPULATE_DISTANCE) {
+          this.populateSystem(star);
+        }
       }
     }
     for (const root of this.roots) root.updateHierarchy(simTime);
