@@ -9,11 +9,11 @@
 | Datei | three | Kern | Deckel | hängt ab von |
 |---|---|---|---|---|
 | `camera/SpaceCamera.ts` | direkt |  |  | camera/cameraPlacement, camera/cameraTouch, core/constants, frames/FrameTree, frames/types, math/Vector3d, nav/dragKernel, nav/orientation, nav/types, nav/vec, universe/CelestialBody |
-| `camera/cameraPlacement.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
+| `camera/cameraPlacement.ts` | direkt |  |  | frames/FrameTree, frames/types, math/Vector3d, universe/CelestialBody |
 | `camera/cameraTouch.ts` | — | ✓ |  | nav/dragKernel, nav/feel, nav/fling, nav/glide, nav/vec |
 | `core/Engine.ts` | direkt |  |  | camera/SpaceCamera, core/EngineHud, core/EngineInput, core/SceneManager, core/SimClock, core/constants, nav/Navigator, nav/types, terrain/TerrainProvider, ui/FlightControls, universe/UniverseManager |
 | `core/EngineHud.ts` | — |  |  | camera/SpaceCamera, core/SimClock, core/constants, nav/Navigator, nav/format, terrain/TerrainProvider, terrain/tileGeometry, ui/FlightControls |
-| `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
+| `core/EngineInput.ts` | — |  |  | camera/SpaceCamera, core/SceneManager, core/SimClock, frames/FrameTree, nav/Navigator, nav/picking, nav/types, nav/vec, universe/CelestialBody, universe/UniverseManager |
 | `core/SceneManager.ts` | direkt |  |  | frames/FrameTree, frames/types, math/Vector3d, universe/CelestialBody |
 | `core/SimClock.ts` | — |  |  | core/constants |
 | `core/constants.ts` | — |  |  |  |
@@ -49,7 +49,7 @@
 | `universe/CelestialBody.ts` | direkt |  |  | core/constants, frames/types, math/Vector3d, physics/Kepler |
 | `universe/Planet.ts` | direkt |  |  | math/Vector3d, terrain/PlanetLOD, terrain/noise, terrain/tileGeometry, universe/CelestialBody |
 | `universe/Star.ts` | direkt |  |  | math/Vector3d, universe/CelestialBody |
-| `universe/UniverseManager.ts` | über math/Vector3d |  |  | core/SceneManager, core/constants, data/catalog.json, math/Vector3d, math/rng, physics/Kepler, terrain/tileGeometry, universe/CelestialBody, universe/Planet, universe/Star, universe/procedural |
+| `universe/UniverseManager.ts` | über math/Vector3d |  |  | core/SceneManager, core/constants, data/catalog.json, frames/FrameTree, frames/types, math/Vector3d, math/rng, nav/vec, physics/Kepler, terrain/tileGeometry, universe/CelestialBody, universe/Planet, universe/Star, universe/procedural |
 | `universe/procedural.ts` | — |  |  | core/constants, math/rng, physics/Kepler, terrain/PlanetLOD |
 
 ## Prüfskripte
@@ -58,8 +58,9 @@
 - `npm run build` — `tsc && vite build`
 - `npm run preview` — `vite preview`
 - `npm run typecheck` — `tsc --noEmit`
-- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
+- `npm run test` — `npm run test:frames && npm run test:camera-frame && npm run test:stage2 && npm run test:nav && npm run test:warp && npm run test:pace && npm run test:orbit && npm run test:orientation && npm run test:drag && npm run test:glide && npm run test:feel && npm run test:throughput`
 - `npm run test:frames` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-frames.ts`
+- `npm run test:stage2` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-stage2.ts`
 - `npm run test:camera-frame` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-camera-frame.ts`
 - `npm run test:warp` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-warp.ts`
 - `npm run test:pace` — `node --experimental-strip-types --import ./tools/register-ts.mjs tools/test-pace.ts`
@@ -106,8 +107,8 @@
 ### `camera/cameraPlacement.ts`
 
 - `interface OrbitPlacementState { distance, targetDistance }`
-- `function clampToSurface(worldPosition: Vector3d, body: CelestialBody, radialScratch: THREE.Vector3): { normal: { x: number; y: number; z: number } | null }`
-- `function placeOrbit(worldPosition: Vector3d, target: CelestialBody | null, state: OrbitPlacementState, viewVector: THREE.Vector3, radialScratch: THREE.Vector3, dt: number): OrbitPlacementState`
+- `function clampToSurface(worldPosition: Vector3d, body: CelestialBody, radialScratch: THREE.Vector3, cameraFrame?: FrameNode | null): { normal: { x: number; y: number; z: number } | null }`
+- `function placeOrbit(worldPosition: Vector3d, target: CelestialBody | null, state: OrbitPlacementState, viewVector: THREE.Vector3, radialScratch: THREE.Vector3, dt: number, cameraFrame?: FrameNode | null): OrbitPlacementState`
 - `function applyDolly(worldPosition: Vector3d, viewVector: THREE.Vector3, freeAltitude: number, pendingDolly: number): void`
 - `function computeNearPlane(altitude: number): number`
 
@@ -600,6 +601,8 @@
 ### `universe/UniverseManager.ts`
 
 - `class UniverseManager`
+  - `readonly universeFrame: FrameNode`
+  - `readonly galaxyFrame: FrameNode`
   - `constructor(private readonly sceneManager: SceneManager)`
   - `loadCatalog(): void`
   - `generateNeighborhood(radius: number): void`

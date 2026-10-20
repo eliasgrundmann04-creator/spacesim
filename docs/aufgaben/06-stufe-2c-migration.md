@@ -1,7 +1,7 @@
 ---
 id: 06
 titel: Stufe 2c — Körper und Katalog in Frames migrieren
-status: offen
+status: erledigt
 braucht: [05]
 stufe: 2c
 tablet: ja

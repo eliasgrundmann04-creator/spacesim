@@ -1,6 +1,8 @@
 import * as THREE from 'three/webgpu';
 import type { Vector3d } from '../math/Vector3d';
 import type { CelestialBody } from '../universe/CelestialBody';
+import type { FrameNode } from '../frames/types';
+import { transformPoint } from '../frames/FrameTree';
 
 export interface OrbitPlacementState {
   distance: number;
@@ -11,10 +13,22 @@ export function clampToSurface(
   worldPosition: Vector3d,
   body: CelestialBody,
   radialScratch: THREE.Vector3,
+  cameraFrame?: FrameNode | null,
 ): { normal: { x: number; y: number; z: number } | null } {
-  const dx = worldPosition.x - body.position.x;
-  const dy = worldPosition.y - body.position.y;
-  const dz = worldPosition.z - body.position.z;
+  let bodyPosX = body.position.x;
+  let bodyPosY = body.position.y;
+  let bodyPosZ = body.position.z;
+
+  if (cameraFrame && body.frame && cameraFrame !== body.frame) {
+    const p = transformPoint({ x: bodyPosX, y: bodyPosY, z: bodyPosZ }, body.frame, cameraFrame);
+    bodyPosX = p.x;
+    bodyPosY = p.y;
+    bodyPosZ = p.z;
+  }
+
+  const dx = worldPosition.x - bodyPosX;
+  const dy = worldPosition.y - bodyPosY;
+  const dz = worldPosition.z - bodyPosZ;
   const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
   if (!(d > 0)) return { normal: null };
 
@@ -23,9 +37,9 @@ export function clampToSurface(
   if (d >= minD) return { normal: null };
 
   worldPosition.set(
-    body.position.x + radialScratch.x * minD,
-    body.position.y + radialScratch.y * minD,
-    body.position.z + radialScratch.z * minD,
+    bodyPosX + radialScratch.x * minD,
+    bodyPosY + radialScratch.y * minD,
+    bodyPosZ + radialScratch.z * minD,
   );
   return { normal: { x: radialScratch.x, y: radialScratch.y, z: radialScratch.z } };
 }
@@ -37,6 +51,7 @@ export function placeOrbit(
   viewVector: THREE.Vector3,
   radialScratch: THREE.Vector3,
   dt: number,
+  cameraFrame?: FrameNode | null,
 ): OrbitPlacementState {
   if (!target) return state;
 
@@ -54,10 +69,25 @@ export function placeOrbit(
   if (targetDistance < minD) targetDistance = minD;
   if (distance < minD) distance = minD;
 
+  let targetPosX = target.position.x;
+  let targetPosY = target.position.y;
+  let targetPosZ = target.position.z;
+
+  if (cameraFrame && target.frame && cameraFrame !== target.frame) {
+    const p = transformPoint(
+      { x: targetPosX, y: targetPosY, z: targetPosZ },
+      target.frame,
+      cameraFrame,
+    );
+    targetPosX = p.x;
+    targetPosY = p.y;
+    targetPosZ = p.z;
+  }
+
   worldPosition.set(
-    target.position.x + radialScratch.x * distance,
-    target.position.y + radialScratch.y * distance,
-    target.position.z + radialScratch.z * distance,
+    targetPosX + radialScratch.x * distance,
+    targetPosY + radialScratch.y * distance,
+    targetPosZ + radialScratch.z * distance,
   );
 
   return { distance, targetDistance };

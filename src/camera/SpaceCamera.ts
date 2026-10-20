@@ -12,7 +12,7 @@ import { applyTurn } from '../nav/dragKernel';
 import { CameraTouchInput } from './cameraTouch';
 import { applyDolly, clampToSurface, computeNearPlane, placeOrbit } from './cameraPlacement';
 import type { FrameNode } from '../frames/types';
-import { updateActiveFrame } from '../frames/FrameTree';
+import { transformPoint, updateActiveFrame } from '../frames/FrameTree';
 
 /**
  * Kamera für 20 Größenordnungen.
@@ -129,9 +129,17 @@ export class SpaceCamera {
     this.touchInput.fling.stop();
     this.touchInput.glide.reset();
 
-    const dx = this.worldPosition.x - body.position.x;
-    const dy = this.worldPosition.y - body.position.y;
-    const dz = this.worldPosition.z - body.position.z;
+    let targetX = body.position.x;
+    let targetY = body.position.y;
+    let targetZ = body.position.z;
+    if (this.frame && body.frame && this.frame !== body.frame) {
+      const p = transformPoint({ x: targetX, y: targetY, z: targetZ }, body.frame, this.frame);
+      targetX = p.x; targetY = p.y; targetZ = p.z;
+    }
+
+    const dx = this.worldPosition.x - targetX;
+    const dy = this.worldPosition.y - targetY;
+    const dz = this.worldPosition.z - targetZ;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (d > 0 && Number.isFinite(d)) {
       this.distance = THREE.MathUtils.clamp(d, MIN_DISTANCE, MAX_DISTANCE);
@@ -203,7 +211,7 @@ export class SpaceCamera {
 
   /** Kollision auf Meter-Ebene: schiebt die Kamera bei Bedarf auf die lokale Terrainhöhe. */
   clampToSurface(body: CelestialBody): Vec3 | null {
-    const res = clampToSurface(this.worldPosition, body, this.radial);
+    const res = clampToSurface(this.worldPosition, body, this.radial, this.frame);
     return res.normal;
   }
 
@@ -238,6 +246,7 @@ export class SpaceCamera {
         this.view,
         this.radial,
         dt,
+        this.frame,
       );
       this.distance = res.distance;
       this.targetDistance = res.targetDistance;
