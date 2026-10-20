@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.17 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.18 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,11 +24,12 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.17)
+## 2. Aktueller Stand (v0.4.18)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 199 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz, 24 Performance/HUD), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 213 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz, 24 Performance/HUD, 14 Messlauf/?bench), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
+- Automatisierter Messlauf (`?bench`) und Leistungsprotokoll in `docs/leistung.md`: fliegt eine feste Route über 6 Halte, misst Bild- und CPU-Zeiten, Kachel-Einschwingen und Rendermetriken, friert die adaptive Auflösung ein und erzeugt eine Markdown-Ergebniszeile (`src/perf/benchRoute.ts`, `src/core/EngineBench.ts`)
 - Messpunkte im HUD (CPU, Bildzeit-Perzentile p50/p95/max über 5 s Zeitfenster, Ruckler, Draw-Calls, Dreiecke, Geometrien; mit `?perf` Aufschlüsselung der 7 Loop-Phasen)
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
 - Floating Origin: f64-CPU-Positionen, Kamera immer bei (0,0,0)
@@ -240,7 +241,7 @@ Die begrenzende Größe dieses Projekts ist nicht der Umfang des Codes, sondern 
 
 ### 8.3 Verifikationsdisziplin
 
-Ein Befehl deckt alles Prüfbare ab und läuft lokal beim Agenten wie in der CI (Node 22.16 und 24):
+Ein Befehl deckt alles Prüfbable ab und läuft lokal beim Agenten wie in der CI (Node 22.16 und 24):
 
 ```json
 "check": "npm run typecheck && npm test && node tools/contracts.mjs --check && vite build"
@@ -366,6 +367,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.15 | Stufe 2b (Aufgabe 05): Kamera hängt in Bezugsrahmen um (`SpaceCamera`, `SceneManager`). `updateActiveFrame` mit SOI-Radius und 15 % Hysterese in `src/frames/FrameTree.ts`. HUD-Anzeige des Kameraframes. 12 Offline-Tests in `tools/test-camera-frame.ts`. |
 | v0.4.16 | Rücknahme von Stufe 2c (v0.5.0, Aufgabe 06) und ihrem Fix (v0.5.1, Aufgabe 21): Code wieder auf dem Stand v0.4.15. Befund in §9 (Kamera ohne Rahmen, still übersprungene Umrechnung, Navigator beim Rahmenwechsel). Neue Aufgabe 22 als Fundament, Aufgaben 14–20 für Nebenspur B. |
 | v0.4.17 | Nebenspur B1 (Aufgabe 14): Messpunkte im HUD. Bildzeit-Perzentile (p50/p95/max) über 5 s Zeitfenster, CPU-Zeit, Ruckler, Draw-Calls, Dreiecke, Geometrien; mit `?perf` Phasen-Aufschlüsselung im Frame-Loop. Three-freier Kern `src/perf/frameStats.ts`, 24 Offline-Tests in `tools/test-perf.ts`. |
+| v0.4.18 | Nebenspur B2 (Aufgabe 15): Messlauf (`?bench`) und Leistungsprotokoll (`docs/leistung.md`). Vordefinierte Route über 6 Halte, automatischer Zustandsautomat (setup → settling → measuring), Ergebnisfeld mit Kopierknopf und 14 Offline-Tests in `tools/test-bench.ts`. |
 
 ---
 
@@ -382,7 +384,7 @@ Verbindlicher Ablauf für jede Aufgabe, egal ob Agent oder Mensch sie bearbeitet
 
 ### 12.2 Währenddessen — Eskalation statt stiller Umplanung
 
-Stellt sich heraus, dass der Auftrag nicht trägt — mehr Dateien nötig, eine Invariante im Weg, eine Annahme falsch —, wird abgebrochen und in drei Sätzen berichtet: was geplant war, was die Realität ist, welche Optionen es gibt. Der Befund geht nach §9, die Aufgabe auf `status: blockiert`. Kein Weiterarbeiten am stillschweigend veränderten Ziel; auf genau diesem Weg gehen Zielbilder verloren.
+Stellt sich heraus, dass der Auftrag nicht trägt — mehr Dateien nötig, eine Invariante im Weg, eine Annahme falsch —, wird abgebrochen und in drei Sätzen berichtet: was planned war, was die Realität ist, welche Optionen es gibt. Der Befund geht nach §9, die Aufgabe auf `status: blockiert`. Kein Weiterarbeiten am stillschweigend veränderten Ziel; auf genau diesem Weg gehen Zielbilder verloren.
 
 ### 12.3 Nachher — Abschluss
 
