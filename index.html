@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Space Sim — Navigation</title>
+  <style>
+    html, body {
+      margin: 0; height: 100%; overflow: hidden; background: #000;
+      overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #app { position: fixed; inset: 0; }
+    #hud {
+      position: fixed; z-index: 10;
+      left: calc(12px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
+      color: #9fd0ff; font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+      text-shadow: 0 0 4px #000, 0 0 4px #000; white-space: pre; pointer-events: none;
+    }
+    #controls {
+      position: fixed; z-index: 10;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      display: flex; gap: 8px; align-items: center;
+      /* Platz für die Flugsteuerung rechts lassen; im Hochformat umbrechen */
+      flex-wrap: wrap; justify-content: center;
+      max-width: calc(100vw - 150px);
+    }
+    /* Overlay der Flugsteuerung (Schubregler, Speed-Stufen). Eigene Ebene, damit
+       die Kamera-Gesten auf dem Canvas ungestört bleiben. */
+    #flight { position: fixed; inset: 0; z-index: 9; pointer-events: none; }
+    #controls button {
+      min-width: 52px; height: 46px; padding: 0 12px;
+      border: 1px solid rgba(159, 208, 255, 0.35); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.62); color: #cfe6ff;
+      font: 15px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+      backdrop-filter: blur(6px); touch-action: manipulation; cursor: pointer;
+    }
+    #controls button:active { background: rgba(60, 120, 190, 0.55); }
+    #controls .warp { min-width: 74px; font-size: 12px; }
+    #err {
+      position: fixed; inset: 0; display: none; place-items: center; z-index: 20;
+      color: #ff7b6b; font: 14px ui-monospace, monospace; padding: 24px;
+      text-align: center; white-space: pre-line;
+    }
+    @media (max-width: 720px) { #hud { font-size: 11px; } }
+  </style>
+  <script type="module" crossorigin src="./assets/index-D_FrsOBZ.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="hud"></div>
+  <div id="flight"></div>
+
+  <!-- Bildschirmsteuerung: auf Tablets gibt es keine Tastatur für Tab / , / . -->
+  <div id="controls">
+    <button data-act="prev" title="Vorheriges Ziel">◀</button>
+    <button data-act="next" title="Nächstes Ziel">▶</button>
+    <button data-act="out" title="Herauszoomen">−</button>
+    <button data-act="in" title="Heranzoomen">+</button>
+    <button data-act="slower" title="Zeitraffer langsamer">≪</button>
+    <button data-act="warp" class="warp" title="Zeitraffer zurücksetzen">×1</button>
+    <button data-act="faster" title="Zeitraffer schneller">≫</button>
+    <button data-act="pause" title="Pause">❚❚</button>
+  </div>
+
+  <div id="err"></div>
+</body>
+</html>
