@@ -2,7 +2,7 @@
 id: 14
 titel: Nebenspur B1 — Messpunkte im HUD
 status: offen
-braucht: [13]
+braucht: [21]
 stufe: B (Performance & Tablet)
 tablet: ja
 ---

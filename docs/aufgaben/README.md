@@ -48,7 +48,8 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 11 | Tuning-Panel — Gefühlswerte live mit Reglern abstimmen | 10 | ja |
 | 12 | Automatisches Tempo — Anflug nach Kontaktzeit, Stufe läuft zur Umgebung zurück | 11 | ja |
 | 13 | Fix: Kamera bleibt bei Zeitraffer über dem Anker — Mitführung über die Verschiebung | 12 | ja |
-| 14 | B1: Messpunkte im HUD — Bildzeit-Perzentile, CPU je Phase, Draw/Tri/Geo | 13 | ja |
+| 21 | **Fix zuerst:** nach 2c rechnen Körper ihren Kameraabstand im falschen Frame (alle Systeme bevölkert, Queue 96) | 06 | ja |
+| 14 | B1: Messpunkte im HUD — Bildzeit-Perzentile, CPU je Phase, Draw/Tri/Geo | 21 | ja |
 | 15 | B2: Messlauf `?bench` und Leistungsprotokoll `docs/leistung.md` | 14 | ja |
 | 16 | B3: Frustum- und Horizont-Culling für Kacheln | 15 | ja |
 | 17 | B4: Instancing — alle Sternglows in einem Draw-Call | 15 | ja |
@@ -74,6 +75,7 @@ gibt es dafür den Messlauf `?bench` und das Protokoll `docs/leistung.md`. Eine 
 Steigt Bild-p95 an einem Halt um mehr als 20 % gegenüber der Vorzeile, ist das ein Pflichteintrag in
 Leitfaden §9 — kein Merge-Verbot, aber nicht stillschweigend.
 
-Reihenfolge: 14 und 15 zuerst, weil sich ohne Messung keine Maßnahme bewerten lässt. Die Basiszeile
+Reihenfolge: 21 vor allem anderen — v0.5.0 ist ohne den Fix nicht benutzbar, und jede Messung davor
+misst nur den Fehler. Dann 14 und 15, weil sich ohne Messung keine Maßnahme bewerten lässt. Die Basiszeile
 entsteht nach Stufe 2c (v0.5) — einen Vorher-Wert für 2c gibt es nicht. Danach 16–19 in dieser
 Reihenfolge, 20 nach 19. Die nächste Kernstufe (3, Photometrie) endet mit einer Messzeile.
