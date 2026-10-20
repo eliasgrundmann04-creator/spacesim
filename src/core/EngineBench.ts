@@ -1,18 +1,21 @@
 import * as THREE from 'three/webgpu';
-import { SpaceCamera } from '../camera/SpaceCamera';
-import { SimClock } from './SimClock';
-import { UniverseManager } from '../universe/UniverseManager';
-import { TerrainProvider } from '../terrain/TerrainProvider';
-import { FrameStats } from '../perf/frameStats';
+import type { SpaceCamera } from '../camera/SpaceCamera';
+import type { SimClock } from './SimClock';
+import type { UniverseManager } from '../universe/UniverseManager';
+import type { CelestialBody } from '../universe/CelestialBody';
+import type { TerrainProvider } from '../terrain/TerrainProvider';
+import type { RendererInfoLike } from '../perf/frameStats';
+import type { BenchState, BenchStop } from '../perf/benchRoute';
 import {
+  BENCH_SIM_TIME,
   BENCH_STOPS,
-  BenchMetrics,
-  BenchState,
-  BenchStop,
+  BenchSampler,
   createInitialBenchState,
   formatBenchReport,
   stepBenchStateMachine,
 } from '../perf/benchRoute';
+import type { Vec3 } from '../nav/vec';
+import { add, cross, dot, normalize, orthogonal, scale, sub, vec3 } from '../nav/vec';
 import pkg from '../../package.json' with { type: 'json' };
 
 export function parseBenchParam(search: string = typeof window !== 'undefined' ? window.location.search : ''): { active: boolean; scale: number } {
@@ -24,149 +27,144 @@ export function parseBenchParam(search: string = typeof window !== 'undefined' ?
   return { active: true, scale: Number.isFinite(parsed) && parsed > 0 ? parsed : 1.0 };
 }
 
+export interface BenchDeps {
+  camera: SpaceCamera;
+  clock: SimClock;
+  getUniverse: () => UniverseManager;
+  terrain: TerrainProvider;
+  /** Navigator-Zustand für einen Halt zurücksetzen (null = ohne Ankermerkpunkt). */
+  resetMotion: (body: CelestialBody | null) => void;
+  backend: string;
+  renderScale: number;
+}
+
+/** dt ≫ tau ⇒ `lookTowards` dreht in einem Aufruf vollständig. */
+const SNAP = Infinity;
+/** Länge der Blickhilfsstrecke: groß gegen die f64-Auflösung der Kameraposition. */
+const LOOK_REACH = 1e6;
+/** Ein Frame über einer Sekunde ist ein Tab-Wechsel, kein Messwert für den Automaten. */
+const MAX_STEP_SEC = 1;
+
+/**
+ * Messlauf (?bench): setzt Kamera und Uhr über deren öffentliche Schnittstelle, füttert den
+ * Automaten aus `benchRoute.ts` jeden Frame und zeigt am Ende das Ergebnis zum Kopieren.
+ */
 export class EngineBench {
   readonly renderScale: number;
+  private readonly deps: BenchDeps;
   private state: BenchState = createInitialBenchState();
+  private readonly sampler = new BenchSampler();
   private lastFrameMs = 0;
 
-  private stopFrameCount = 0;
-  private stopDtMsList: number[] = [];
-  private stopCpuMsList: number[] = [];
-  private stopDrawCallsSum = 0;
-  private stopTrianglesSum = 0;
-  private stopGeometriesSum = 0;
-  private stopStuttersCount = 0;
-
-  constructor(
-    private readonly camera: SpaceCamera,
-    private readonly clock: SimClock,
-    private readonly getUniverse: () => UniverseManager,
-    private readonly terrain: TerrainProvider,
-    private readonly stats: FrameStats,
-    renderScale = 1.0,
-  ) {
-    this.renderScale = renderScale;
-    this.clock.simTime = 0;
-    this.clock.resetWarp();
+  constructor(deps: BenchDeps) {
+    this.deps = deps;
+    this.renderScale = deps.renderScale;
+    deps.clock.simTime = BENCH_SIM_TIME;
+    deps.clock.paused = false;
+    deps.clock.resetWarp();
   }
 
-  step(nowMs: number): void {
+  /** Nach `endFrame`: frameStartMs = Beginn dieses Frames, cpuMs = seine CPU-Zeit. */
+  step(frameStartMs: number, cpuMs: number, info: RendererInfoLike): void {
     if (this.state.phase === 'complete') return;
     if (this.lastFrameMs === 0) {
-      this.lastFrameMs = nowMs;
-      this.positionForStop(BENCH_STOPS[this.state.stopIndex]);
+      this.lastFrameMs = frameStartMs;
       return;
     }
 
-    const dtSec = Math.max(0.001, Math.min(0.1, (nowMs - this.lastFrameMs) / 1000));
-    this.lastFrameMs = nowMs;
+    const dtMs = frameStartMs - this.lastFrameMs;
+    this.lastFrameMs = frameStartMs;
 
-    if (this.state.phase === 'measuring') this.recordFrameMetrics();
+    if (this.state.phase === 'measuring') {
+      this.sampler.add(dtMs, cpuMs, info.render?.drawCalls ?? 0, info.render?.triangles ?? 0, info.memory?.geometries ?? 0);
+    }
 
     const result = stepBenchStateMachine(this.state, {
-      dtSec,
-      pendingQueue: this.terrain.pending,
-      getMetricsForCurrentStop: () => this.calculateStopMetrics(),
+      dtSec: Math.min(dtMs / 1000, MAX_STEP_SEC),
+      pendingQueue: this.deps.terrain.pending,
+      getMetricsForCurrentStop: () => this.sampler.summarize(),
     });
-
     this.state = result.nextState;
 
     if (result.action === 'transition_stop') {
-      this.resetStopMetrics();
+      this.sampler.reset();
       this.positionForStop(BENCH_STOPS[this.state.stopIndex]);
     } else if (result.action === 'finish') {
       this.onFinish();
     }
   }
 
-  private resetStopMetrics(): void {
-    this.stopFrameCount = 0;
-    this.stopDtMsList = [];
-    this.stopCpuMsList = [];
-    this.stopDrawCallsSum = 0;
-    this.stopTrianglesSum = 0;
-    this.stopGeometriesSum = 0;
-    this.stopStuttersCount = 0;
-  }
-
-  private recordFrameMetrics(): void {
-    const s = this.stats.getSummary();
-    this.stopFrameCount++;
-    this.stopDtMsList.push(s.dtP50Ms);
-    this.stopCpuMsList.push(s.cpuLastMs);
-    this.stopDrawCallsSum += s.drawCalls;
-    this.stopTrianglesSum += s.triangles;
-    this.stopGeometriesSum += s.geometries;
-    if (s.stutters > 0) this.stopStuttersCount += s.stutters;
-  }
-
-  private calculateStopMetrics(): BenchMetrics {
-    if (this.stopDtMsList.length === 0) {
-      const s = this.stats.getSummary();
-      return { dtP50Ms: s.dtP50Ms, dtP95Ms: s.dtP95Ms, dtMaxMs: s.dtMaxMs, cpuP95Ms: s.cpuP95Ms, stutters: s.stutters, drawCalls: s.drawCalls, triangles: s.triangles, geometries: s.geometries };
-    }
-
-    const dtSorted = [...this.stopDtMsList].sort((a, b) => a - b);
-    const cpuSorted = [...this.stopCpuMsList].sort((a, b) => a - b);
-    const len = dtSorted.length;
-
-    return {
-      dtP50Ms: dtSorted[Math.floor(len * 0.5)],
-      dtP95Ms: dtSorted[Math.floor(len * 0.95)],
-      dtMaxMs: dtSorted[len - 1],
-      cpuP95Ms: cpuSorted[Math.floor(len * 0.95)],
-      stutters: this.stopStuttersCount,
-      drawCalls: Math.round(this.stopDrawCallsSum / len),
-      triangles: Math.round(this.stopTrianglesSum / len),
-      geometries: Math.round(this.stopGeometriesSum / len),
-    };
-  }
-
   private positionForStop(stop: BenchStop): void {
-    this.clock.resetWarp();
-    const universe = this.getUniverse();
-    const targetBody = universe.findBody(stop.targetBodyName) ?? universe.findBody('Erde');
-    if (!targetBody) return;
-
-    if (stop.mode === 'orbit') {
-      const dist = stop.altitudeOrDistance * targetBody.radius;
-      this.camera.setWorldPosition({ x: targetBody.position.x + dist, y: targetBody.position.y, z: targetBody.position.z });
-      this.camera.focus(targetBody);
-      this.camera.enterOrbit(targetBody);
-    } else {
-      this.camera.enterFreeFlight();
-      if (stop.customRelativePos) {
-        const rel = stop.customRelativePos;
-        const pos = { x: targetBody.position.x + rel.x, y: targetBody.position.y + rel.y, z: targetBody.position.z + rel.z };
-        this.camera.setWorldPosition(pos);
-        const lookTarget = universe.findBody(stop.customLookTarget ?? 'Sonne') ?? targetBody;
-        this.camera.lookTowards({ x: lookTarget.position.x, y: lookTarget.position.y, z: lookTarget.position.z }, 0.001);
-      } else {
-        const dir = { x: 1, y: 0, z: 0 };
-        const surfOffset = targetBody.getSurfaceOffset(new THREE.Vector3(dir.x, dir.y, dir.z));
-        const totalDist = targetBody.radius + surfOffset + stop.altitudeOrDistance;
-        const pos = { x: targetBody.position.x + dir.x * totalDist, y: targetBody.position.y + dir.y * totalDist, z: targetBody.position.z + dir.z * totalDist };
-        this.camera.setWorldPosition(pos);
-        this.camera.setFreeAltitude(stop.altitudeOrDistance);
-
-        if (stop.pitchDeg !== undefined) {
-          const rad = (stop.pitchDeg * Math.PI) / 180;
-          this.camera.lookTowards({ x: pos.x + Math.sin(rad) * 10000, y: pos.y + Math.cos(rad) * 10000, z: pos.z }, 0.001);
-        } else {
-          this.camera.lookTowards({ x: pos.x, y: pos.y + 10000, z: pos.z }, 0.001);
-        }
-      }
+    const { camera, clock } = this.deps;
+    clock.resetWarp();
+    const universe = this.deps.getUniverse();
+    const body = universe.findBody(stop.body);
+    if (!body) {
+      console.warn(`[EngineBench] Körper „${stop.body}" fehlt — Halt ${stop.id} übersprungen.`);
+      return;
     }
+    const center = vec3(body.position.x, body.position.y, body.position.z);
+
+    if (stop.kind === 'orbit') {
+      const u = normalize(stop.radial ?? vec3(1, 0, 0));
+      camera.setWorldPosition(add(center, scale(u, stop.distance * body.radius)));
+      camera.enterOrbit(body);
+      return;
+    }
+
+    camera.enterFreeFlight();
+
+    if (stop.kind === 'space') {
+      const pos = add(center, stop.offset ?? vec3());
+      camera.setWorldPosition(pos);
+      camera.setFreeAltitude(stop.distance);
+      const target = universe.findBody(stop.lookAt ?? stop.body) ?? body;
+      camera.lookTowards(target.position, SNAP);
+      this.deps.resetMotion(null);
+      return;
+    }
+
+    const u = normalize(stop.radial ?? vec3(1, 0, 0));
+    const ground = body.radius + body.getSurfaceOffset(new THREE.Vector3(u.x, u.y, u.z));
+    const pos = add(center, scale(u, ground + stop.distance));
+    camera.setWorldPosition(pos);
+    camera.setFreeAltitude(stop.distance);
+    this.levelView(pos, u, (stop.pitchDeg ?? 0) * (Math.PI / 180));
+    this.deps.resetMotion(body);
+  }
+
+  /**
+   * Blick nach Norden, `pitch` unter die Waagerechte, Horizont waagerecht im Bild.
+   * `lookTowards` dreht auf dem kürzesten Bogen und behält dabei den Roll — deshalb in Schritten,
+   * deren Drehachse jeweils bekannt ist:
+   *   1. senkrecht nach unten (−u)
+   *   2. auf die dabei entstandene Oben-Richtung h: 90° um die Rechtsachse ⇒ Blick h, oben u
+   *   3. auf Norden: Drehung um u (über einen Zwischenschritt, falls Norden hinter h liegt)
+   *   4. um die Rechtsachse auf die Neigung
+   */
+  private levelView(pos: Vec3, u: Vec3, pitch: number): void {
+    const { camera } = this.deps;
+    const look = (dir: Vec3) => camera.lookTowards(add(pos, scale(dir, LOOK_REACH)), SNAP);
+    const horizontal = (v: Vec3) => normalize(sub(v, scale(u, dot(v, u))), orthogonal(u));
+
+    look(scale(u, -1));
+    const h = horizontal(camera.basis().up);
+    look(h);
+
+    const north = horizontal(vec3(0, 0, 1));
+    if (dot(h, north) < -0.5) look(normalize(cross(u, h)));
+    look(north);
+
+    if (pitch !== 0) look(add(scale(north, Math.cos(pitch)), scale(u, -Math.sin(pitch))));
   }
 
   private onFinish(): void {
-    const isWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : 'Node/Offline';
     const report = formatBenchReport({
       version: `v${pkg.version}`,
       date: new Date().toISOString().split('T')[0],
-      device: shortenUserAgent(ua),
-      backend: isWebGPU ? 'WebGPU' : 'WebGL2',
+      device: shortenUserAgent(ua, typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0),
+      backend: this.deps.backend,
       renderScale: `${this.renderScale.toFixed(1).replace('.', ',')}×`,
     }, this.state.results);
 
@@ -217,14 +215,17 @@ export class EngineBench {
   }
 }
 
-function shortenUserAgent(ua: string): string {
-  if (ua.includes('iPad')) return 'iPad (Safari)';
+/**
+ * Gekürzter User-Agent. Chrome auf Android-Tablets und Safari auf iPadOS melden sich standardmäßig
+ * als Desktop (Linux/Macintosh) — erst die Touchpunkte verraten das Tablet.
+ */
+function shortenUserAgent(ua: string, touchPoints: number): string {
+  const touch = touchPoints > 1;
+  if (ua.includes('iPad') || (touch && ua.includes('Macintosh'))) return 'iPad (Safari)';
   if (ua.includes('iPhone')) return 'iPhone (Safari)';
-  if (ua.includes('Android')) return 'Android';
-  if (ua.includes('Chrome')) return 'Chrome/Desktop';
-  if (ua.includes('Safari')) return 'Safari/Desktop';
-  if (ua.includes('Firefox')) return 'Firefox/Desktop';
-  return ua.slice(0, 24);
+  if (ua.includes('Android')) return ua.includes('Mobile') ? 'Android-Telefon (Chrome)' : 'Android-Tablet (Chrome)';
+  const browser = ua.includes('Firefox') ? 'Firefox' : ua.includes('Chrome') ? 'Chrome' : ua.includes('Safari') ? 'Safari' : ua.slice(0, 24);
+  return touch ? `Tablet (${browser}, Desktop-UA)` : `${browser}/Desktop`;
 }
 
 let stylesInjected = false;

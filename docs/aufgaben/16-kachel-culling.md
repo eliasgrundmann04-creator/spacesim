@@ -47,7 +47,8 @@ Offline-Test `tools/test-cull.ts` (neu, in `npm test` eingehängt) zeigt mit Zah
     *kleinste* mögliche Oberfläche (Radius minus größte mögliche Tiefe aus den Terrainparametern).
   - Die Split-Regel aus `QuadtreeTile.update` (Stufe, `SPLIT_FACTOR`, Rückseiten-Guard) als exportierte
     Funktion, damit Test und `PlanetLOD` dieselbe Regel benutzen. Wortgleich verschieben, dann den
-    Culling-Term ergänzen.
+    Culling-Term ergänzen. *Nachtrag v0.4.19:* Aufgabe 23 legt die Regel schon in
+    `src/terrain/lodKernel.ts` — dort ergänzen statt ein zweites Mal verschieben.
 - **Verfeinern:** Eine Kachel wird nur gesplittet, wenn die bisherige Regel es will **und** ihre
   Hüllkugel im erweiterten Sichtkegel und vor dem Horizont liegt.
 - **Nicht zusammenlegen wegen Culling:** Vorhandene Kinder bleiben, wenn sie aus dem Blick geraten;

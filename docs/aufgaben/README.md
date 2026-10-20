@@ -30,7 +30,7 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 - **Neue Aufgaben** schreibt der Inhaber (oder ein Agent auf ausdrücklichen Auftrag) nach diesem Muster.
   Ein *Fertig, wenn*, das sich nicht prüfen lässt, ist ein Zeichen, dass die Aufgabe noch nicht geschnitten ist.
 
-## Reihenfolge (Stand v0.4.16)
+## Reihenfolge (Stand v0.4.19)
 
 | id | Aufgabe | braucht | tablet |
 |---|---|---|---|
@@ -55,7 +55,9 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 18 | B5: Lichtbudget — zwei Lichtplätze statt ein Licht pro Stern | 17 | ja |
 | 19 | B6: Speicherbudget für Kacheln mit Verdrängung | 16 | ja |
 | 20 | B7: Entscheidungsvorlage — wann ferne Systeme entladen werden | 06, 19 | nein |
-| 22 | Stufe 2b nachziehen: Rahmenwechsel im echten Frame-Loop, ohne stilles Überspringen | 15 | ja |
+| 22 | Stufe 2b nachziehen: Rahmenwechsel im echten Frame-Loop, ohne stilles Überspringen | 23, 24 | ja |
+| 23 | Kacheln grob vor fein — nach einem Sprung schärft sich der Boden stufenweise | 15 | ja |
+| 24 | Höhe über Grund — HUD, Flugtempo und Kontaktzeit ab dem Boden | 23 | ja |
 
 **Eine nach der anderen.** 01–04 hängen nicht voneinander ab, aber parallele PRs kollidieren in
 `package.json` (Version), `docs/contracts.md` und Leitfaden §2/§11. Für ein Einpersonenprojekt kostet
@@ -75,8 +77,9 @@ gibt es dafür den Messlauf `?bench` und das Protokoll `docs/leistung.md`. Eine 
 Steigt Bild-p95 an einem Halt um mehr als 20 % gegenüber der Vorzeile, ist das ein Pflichteintrag in
 Leitfaden §9 — kein Merge-Verbot, aber nicht stillschweigend.
 
-Reihenfolge (Stand v0.4.16, nach Rücknahme von 06): **14 → 15 → 22 → 16–19**, 06 sobald neu geschnitten, 20 nach 06 und 19.
+Reihenfolge (Stand v0.4.19): **14 → 15 → 23 → 24 → 22 → 16–19**, 06 sobald neu geschnitten, 20 nach 06 und 19.
 14 und 15 zuerst, weil sich ohne Messung keine Maßnahme bewerten lässt und v0.4.16 eine saubere
-Basiszeile liefert. 22 legt das Fundament, auf dem 06 neu aufsetzt; 16 und 17 warten auf 22, damit die
+Basiszeile liefert. 23 und 24 kommen vor 22 (Entscheidung des Inhabers, 20.10.2026): Sie beheben
+zwei Befunde des ersten Messlaufs, die sonst jede weitere Messung und Sichtprüfung verfälschen. 22 legt das Fundament, auf dem 06 neu aufsetzt; 16 und 17 warten auf 22, damit die
 Warteschlange (erste offene Datei nach Nummer) diese Reihenfolge von selbst einhält. Den Neuschnitt von
 06 beauftragt der Inhaber; danach wird 06 gegen die Basiszeile gemessen. Die frühere Aufgabe 21 (Fix nach 06) ist mit der Rücknahme entfallen.

@@ -2,7 +2,7 @@
 id: 22
 titel: Stufe 2b nachziehen — Rahmenwechsel im echten Frame-Loop, ohne stilles Überspringen
 status: offen
-braucht: [15]
+braucht: [23, 24]
 stufe: 2b (Nachtrag)
 tablet: ja
 ---
