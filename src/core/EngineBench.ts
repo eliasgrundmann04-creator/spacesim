@@ -163,7 +163,7 @@ export class EngineBench {
     const report = formatBenchReport({
       version: `v${pkg.version}`,
       date: new Date().toISOString().split('T')[0],
-      device: shortenUserAgent(ua),
+      device: shortenUserAgent(ua, typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0),
       backend: this.deps.backend,
       renderScale: `${this.renderScale.toFixed(1).replace('.', ',')}×`,
     }, this.state.results);
@@ -215,14 +215,17 @@ export class EngineBench {
   }
 }
 
-function shortenUserAgent(ua: string): string {
-  if (ua.includes('iPad')) return 'iPad (Safari)';
+/**
+ * Gekürzter User-Agent. Chrome auf Android-Tablets und Safari auf iPadOS melden sich standardmäßig
+ * als Desktop (Linux/Macintosh) — erst die Touchpunkte verraten das Tablet.
+ */
+function shortenUserAgent(ua: string, touchPoints: number): string {
+  const touch = touchPoints > 1;
+  if (ua.includes('iPad') || (touch && ua.includes('Macintosh'))) return 'iPad (Safari)';
   if (ua.includes('iPhone')) return 'iPhone (Safari)';
-  if (ua.includes('Android')) return 'Android';
-  if (ua.includes('Chrome')) return 'Chrome/Desktop';
-  if (ua.includes('Safari')) return 'Safari/Desktop';
-  if (ua.includes('Firefox')) return 'Firefox/Desktop';
-  return ua.slice(0, 24);
+  if (ua.includes('Android')) return ua.includes('Mobile') ? 'Android-Telefon (Chrome)' : 'Android-Tablet (Chrome)';
+  const browser = ua.includes('Firefox') ? 'Firefox' : ua.includes('Chrome') ? 'Chrome' : ua.includes('Safari') ? 'Safari' : ua.slice(0, 24);
+  return touch ? `Tablet (${browser}, Desktop-UA)` : `${browser}/Desktop`;
 }
 
 let stylesInjected = false;
