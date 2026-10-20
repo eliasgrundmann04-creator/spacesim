@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.4.15 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.16 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,7 +24,7 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.4.15)
+## 2. Aktueller Stand (v0.4.16)
 
 Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 175 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
@@ -42,7 +42,7 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Agent-Betrieb: `AGENTS.md`, CI auf jedem PR, Vertragskarte mit Invarianten-Prüfung, Aufgabenwarteschlange in `docs/aufgaben/` (§8, §12)
 
 **Fehlt strukturell** (nicht „noch nicht gebaut", sondern „blockiert Weiteres"):
-- Ein einziger Weltursprung. f64 löst bei 1 Lj nur noch ~2 m auf, bei 16 Lj ~30 m (§3.1). Sterne darzustellen trägt damit bis ~10³ Lj — bodennaher Flug ist aber schon auf Planeten der prozeduralen Nachbarsysteme nicht mehr sauber. Der Effekt ist vermessen, nicht nur hergeleitet: dasselbe Sonnensystem 3 Lj vom Ursprung verliert ~0,16 m/s Weltgeschwindigkeit allein durch Rundung (`tools/test-orbit.ts`). Genau das behebt Stufe 2
+- Ein einziger Weltursprung. f64 löst bei 1 Lj nur noch ~2 m auf, bei 16 Lj ~30 m (§3.1). Sterne darzustellen trägt damit bis ~10³ Lj — bodennaher Flug ist aber schon auf Planeten der prozeduralen Nachbarsysteme nicht mehr sauber. Der Effekt ist vermessen, nicht nur hergeleitet: dasselbe Sonnensystem 3 Lj vom Ursprung verliert ~0,16 m/s Weltgeschwindigkeit allein durch Rundung (`tools/test-orbit.ts`). Genau das behebt Stufe 2. Stand: Frame-Baum (2a) und Kamera-Umhängen (2b) existieren als Code und Tests, sind zur Laufzeit aber nicht verdrahtet — die Kamera bekommt nie einen Rahmen, die Körper rechnen absolut. Ein erster Versuch von 2c ist zurückgenommen (§9); Fundament dafür ist Aufgabe 22
 - Keine physikalische Photometrie ⇒ Helligkeiten sind kalibriert-geraten, nicht gerechnet
 - Kein Punktwolken- und kein Volumen-Renderer
 
@@ -311,6 +311,11 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 - **Noch nicht automatisierte Invarianten** (§8.3.3): keine f32-Weltkoordinaten (statisch schwer — Kandidat: Laufzeit-Assertion im `SceneManager`), Seed-Determinismus (Kandidat: Hash über ein prozedurales System in einem Offline-Test).
 - **Nordausrichtung der Kamera** — Zwei-Finger-Drehen umgesetzt (v0.4.7, Aufgabe 08): Der Roll bleibt, wie die Gesten ihn hinterlassen, lässt sich aber mit zwei Fingern ausdrücklich zurückdrehen (Totzone 8°, danach 1:1). Eine automatische Nivellierung gibt es weiterhin nicht. Offen bleibt nur, ob zusätzlich ein Knopf „Norden oben" gewünscht ist — Entscheidung des Inhabers.
 - **Aufgabentext gegen den Stand von `main`** (Befund aus Aufgabe 08): Die Aufgabe nannte `SpaceCamera.ts` (Ratsche 473) und Version 0.4.5. Seit Aufgabe 02 (v0.4.6) liegt die Gestenverdrahtung in `camera/cameraTouch.ts`, `SpaceCamera.ts` hat keinen Ratscheneintrag mehr. Umgesetzt in `cameraTouch.ts` mit derselben Auflage (wächst nicht: 153 Zeilen), Version 0.4.7.
+- **Stufe 2c zurückgenommen** (v0.4.16; Befund aus Aufgabe 06 und 21): Nach dem Merge von v0.5.0 stand die Warteschlange sofort auf 96, ~12 fps; nach dem Fix v0.5.1 war die Warteschlange leer, aber nichts funktionierte. Drei Ursachen, im Browser mit dem Stand von `main` nachgemessen:
+  1. *Die Kamera hatte zur Laufzeit nie einen Rahmen.* `SpaceCamera.setFrame()` wird seit Aufgabe 05 nirgends aufgerufen; `tools/test-camera-frame.ts` rief es selbst und war deshalb grün. Das im PR von 05 versprochene `[Frame: …]` im HUD erschien nie.
+  2. *Fehlende Rahmen wurden still übersprungen* (`if (cameraFrame && body.frame && …)`). Seit 2c liegt jeder Körper bei (0,0,0) im eigenen Rahmen ⇒ ohne Umrechnung standen alle an einem Punkt (Sonne und Erde beide bei 3,82·10⁷ m vor der Kamera), vorher wurden aus demselben Grund alle 80 Nachbarsysteme bevölkert und alle 285 Gesteinsplaneten verfeinert.
+  3. *Der Navigator überlebt keinen Rahmenwechsel*: `updateFrame()` rechnet nur die Kameraposition um, der Merkpunkt der Mitführung bleibt im alten Rahmen.
+  Dazu: 06 änderte sieben Dateien unter `src/` ohne Eskalation (Grenze fünf). Folgerung: eine Umrechnungsstelle, die einen fehlenden Rahmen als Fehler meldet; ein Prüfstand über den ganzen Frame-Loop statt Tests der Einzelteile; Laufzeit-Selbsttest „Rahmen fehlt" (Aufgabe 22); 06 wird danach neu geschnitten. Kanon-Kandidat: *Eine Umrechnung zwischen Rahmen darf nie still entfallen — fehlt ein Rahmen, ist das ein Fehler, kein Sonderfall.*
 - **Parameter-Properties** in `SpaceCamera`, `PlanetLOD`, `UniverseManager` (`constructor(private readonly …)`): Node-Type-Stripping kann sie nicht entfernen, die Dateien sind damit nicht offline ladbar. Erst umstellen, wenn ein Test sie braucht.
 
 ---
@@ -358,6 +363,7 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
 | v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Nachtrag: Entscheidung für Option B (hierarchisch nach SOI) am 19.10.2026 eingetragen. |
 | v0.4.15 | Stufe 2b (Aufgabe 05): Kamera hängt in Bezugsrahmen um (`SpaceCamera`, `SceneManager`). `updateActiveFrame` mit SOI-Radius und 15 % Hysterese in `src/frames/FrameTree.ts`. HUD-Anzeige des Kameraframes. 12 Offline-Tests in `tools/test-camera-frame.ts`. |
+| v0.4.16 | Rücknahme von Stufe 2c (v0.5.0, Aufgabe 06) und ihrem Fix (v0.5.1, Aufgabe 21): Code wieder auf dem Stand v0.4.15. Befund in §9 (Kamera ohne Rahmen, still übersprungene Umrechnung, Navigator beim Rahmenwechsel). Neue Aufgabe 22 als Fundament, Aufgaben 14–20 für Nebenspur B. |
 
 ---
 

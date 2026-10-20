@@ -30,7 +30,7 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 - **Neue Aufgaben** schreibt der Inhaber (oder ein Agent auf ausdrücklichen Auftrag) nach diesem Muster.
   Ein *Fertig, wenn*, das sich nicht prüfen lässt, ist ein Zeichen, dass die Aufgabe noch nicht geschnitten ist.
 
-## Reihenfolge (Stand v0.5.0)
+## Reihenfolge (Stand v0.4.16)
 
 | id | Aufgabe | braucht | tablet |
 |---|---|---|---|
@@ -40,7 +40,7 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 03 | `Engine.ts` unter den Deckel teilen | 00 | ja |
 | 04 | Entscheidungsvorlage Frame-Wechsel-Schwellen | 00 | nein |
 | 05 | Stufe 2b: Kamera hängt um | 01–04 | ja |
-| 06 | Stufe 2c: Körper und Katalog migrieren | 05 | ja |
+| 06 | Stufe 2c: Körper und Katalog migrieren — *Entwurf, wird nach 22 neu geschnitten* | 15, 22 | ja |
 | 07 | Touch-Gesten: Globus folgt dem Finger | 00 | ja |
 | 08 | Orbit-Griff über den Rand, Zwei-Finger-Drehen | 07 | ja |
 | 09 | Kamera-Gefühl: Nachlauf, Drehschwelle, gleichmäßiger Orbit, `?feel=` | 08 | ja |
@@ -48,14 +48,14 @@ Danach: **Ziel**, **Fertig, wenn** (prüfbar, möglichst als Test), **Dateien** 
 | 11 | Tuning-Panel — Gefühlswerte live mit Reglern abstimmen | 10 | ja |
 | 12 | Automatisches Tempo — Anflug nach Kontaktzeit, Stufe läuft zur Umgebung zurück | 11 | ja |
 | 13 | Fix: Kamera bleibt bei Zeitraffer über dem Anker — Mitführung über die Verschiebung | 12 | ja |
-| 21 | **Fix zuerst:** nach 2c rechnen Körper ihren Kameraabstand im falschen Frame (alle Systeme bevölkert, Queue 96) | 06 | ja |
-| 14 | B1: Messpunkte im HUD — Bildzeit-Perzentile, CPU je Phase, Draw/Tri/Geo | 21 | ja |
+| 14 | B1: Messpunkte im HUD — Bildzeit-Perzentile, CPU je Phase, Draw/Tri/Geo | 13 | ja |
 | 15 | B2: Messlauf `?bench` und Leistungsprotokoll `docs/leistung.md` | 14 | ja |
-| 16 | B3: Frustum- und Horizont-Culling für Kacheln | 15 | ja |
-| 17 | B4: Instancing — alle Sternglows in einem Draw-Call | 15 | ja |
+| 16 | B3: Frustum- und Horizont-Culling für Kacheln | 22 | ja |
+| 17 | B4: Instancing — alle Sternglows in einem Draw-Call | 22 | ja |
 | 18 | B5: Lichtbudget — zwei Lichtplätze statt ein Licht pro Stern | 17 | ja |
 | 19 | B6: Speicherbudget für Kacheln mit Verdrängung | 16 | ja |
 | 20 | B7: Entscheidungsvorlage — wann ferne Systeme entladen werden | 06, 19 | nein |
+| 22 | Stufe 2b nachziehen: Rahmenwechsel im echten Frame-Loop, ohne stilles Überspringen | 15 | ja |
 
 **Eine nach der anderen.** 01–04 hängen nicht voneinander ab, aber parallele PRs kollidieren in
 `package.json` (Version), `docs/contracts.md` und Leitfaden §2/§11. Für ein Einpersonenprojekt kostet
@@ -75,7 +75,8 @@ gibt es dafür den Messlauf `?bench` und das Protokoll `docs/leistung.md`. Eine 
 Steigt Bild-p95 an einem Halt um mehr als 20 % gegenüber der Vorzeile, ist das ein Pflichteintrag in
 Leitfaden §9 — kein Merge-Verbot, aber nicht stillschweigend.
 
-Reihenfolge: 21 vor allem anderen — v0.5.0 ist ohne den Fix nicht benutzbar, und jede Messung davor
-misst nur den Fehler. Dann 14 und 15, weil sich ohne Messung keine Maßnahme bewerten lässt. Die Basiszeile
-entsteht nach Stufe 2c (v0.5) — einen Vorher-Wert für 2c gibt es nicht. Danach 16–19 in dieser
-Reihenfolge, 20 nach 19. Die nächste Kernstufe (3, Photometrie) endet mit einer Messzeile.
+Reihenfolge (Stand v0.4.16, nach Rücknahme von 06): **14 → 15 → 22 → 16–19**, 06 sobald neu geschnitten, 20 nach 06 und 19.
+14 und 15 zuerst, weil sich ohne Messung keine Maßnahme bewerten lässt und v0.4.16 eine saubere
+Basiszeile liefert. 22 legt das Fundament, auf dem 06 neu aufsetzt; 16 und 17 warten auf 22, damit die
+Warteschlange (erste offene Datei nach Nummer) diese Reihenfolge von selbst einhält. Den Neuschnitt von
+06 beauftragt der Inhaber; danach wird 06 gegen die Basiszeile gemessen. Die frühere Aufgabe 21 (Fix nach 06) ist mit der Rücknahme entfallen.

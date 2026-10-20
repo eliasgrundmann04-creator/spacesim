@@ -2,7 +2,7 @@
 id: 16
 titel: Nebenspur B3 — Frustum- und Horizont-Culling für Kacheln
 status: offen
-braucht: [15]
+braucht: [22]
 stufe: B (Performance & Tablet)
 tablet: ja
 ---

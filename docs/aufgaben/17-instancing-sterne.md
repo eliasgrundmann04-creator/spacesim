@@ -2,7 +2,7 @@
 id: 17
 titel: Nebenspur B4 — Instancing: alle Sternglows in einem Draw-Call
 status: offen
-braucht: [15]
+braucht: [22]
 stufe: B (Performance & Tablet)
 tablet: ja
 ---
