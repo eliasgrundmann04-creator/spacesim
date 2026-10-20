@@ -1,6 +1,6 @@
 # Space Sim — Projektleitfaden
 
-**Stand:** v0.5.0 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
+**Stand:** v0.4.15 · Dieses Dokument ist die verbindliche Referenz für alle Folgearbeiten.
 Bei Widerspruch zwischen Aufgabe, Chat und diesem Dokument gilt dieses Dokument — oder es wird hier geändert.
 Maßgeblich ist `docs/leitfaden.md` im Repo; Kopien an anderer Stelle sind Spiegel.
 Wie Agenten damit arbeiten, regelt `AGENTS.md`.
@@ -24,9 +24,9 @@ Bewusst *nicht* verfolgt, bis ein konkreter Anlass entsteht:
 
 ---
 
-## 2. Aktueller Stand (v0.5.0)
+## 2. Aktueller Stand (v0.4.15)
 
-Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 181 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 6 Stufe 2, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
+Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type-Stripping, kein Build-Schritt). `npm run check` läuft grün: strikter Typecheck gegen die echten Typen, 175 Offline-Tests (7 Frame-Baum, 12 Kamera-Frame, 41 Navigation, 10 Kepler, 19 Orientierung, 47 Gesten, 12 Gleitflug, 27 Durchsatz), Vertragskarte, Produktionsbuild.
 
 **Vorhanden:**
 - WebGPU-Renderer (`three/webgpu`) mit logarithmischem Depth-Buffer, automatischer WebGL2-Fallback
@@ -36,7 +36,6 @@ Läuft im Tablet-Browser. TypeScript; Node ≥ 22.6 für die Offline-Tests (Type
 - Cube-Sphere-LOD-Quadtree bis Level 14 (~50 m Vertexabstand), asynchron über Worker-Pool; optionaler WGSL-Compute-Pfad via TSL (`?terrain=gpu`) mit Selbsttest und Fallback
 - Kachel-Pipeline mit Wachhund: unbeantwortete Worker-Jobs werden erkannt und einmal neu gestellt, nach sechs Verlusten dauerhafter Wechsel auf den synchronen Pfad; Prioritäten werden jedes Frame nachgeführt
 - **Navigation (Stufe 1):** freier Flug mit Geschwindigkeit ∝ Referenzhöhe, Goto als Interpolation von `ln d` gegen die *laufend* nachgeführte Zielposition mit analytisch berechneter Übergabegeschwindigkeit; Geschwindigkeitsdeckel pro Sekunde, nicht pro Frame (framerate-unabhängig). Der Kamera-Freiflug wird über die Positionsdifferenz/Verschiebung des Ankerkörpers mitgeführt (nicht über v · dt). Der Kern liegt isoliert und three-frei in `src/nav/`. Gleit-Modus (`?feel=glide:1`): Pinch steuert Schub und Bremsen mit Bremsraste und framerate-unabhängigem Abklingen; die Flugrichtung folgt dem Blick verzögert. Automatisches Tempo (v0.4.11): Kontaktzeit-Begrenzer drosselt die Anflugsgeschwindigkeit sanft vor dem Aufprall (`ttcMin = 0,6 s`); Stufen-Rückführung führt die wählbare Geschwindigkeitsstufe beim Entfernen vom Ort des Setzens einseitig auf ×1 zurück (`stageHalfDecades = 1`). Beide Funktionen sind per `?feel=autoPace:0` abschaltbar.
-- **Verschachtelte Bezugsrahmen (Stufe 2):** Hierarchischer Bezugsrahmen-Baum (`FrameNode` in `src/frames/`). Jedes System, jeder Stern und jeder Planet besitzt einen eigenen lokalen Bezugsrahmen. Kamera hängt sich bei Überschreiten der Gravitationsdominanz (SOI-Radius mit 15 % Hysterese) automatisch um. Körperpositionen und Kepler-Propagation werden lokal im eigenen Bezugsrahmen gerechnet.
 - Zwei-Modi-Kamera (`orbit`/`free`) mit gemeinsamem Orientierungs-Quaternion (kein Polanschlag), dadurch nahtloser Moduswechsel; Multi-Pointer-Touch: Ein-Finger-Zug, Pinch-Zoom, Zwei-Finger-Pan, iOS-Gestenunterdrückung. Seit v0.4.4 dreht nichts von selbst (keine Roll-Nivellierung mehr): jede Drehung ist eine reine Funktion der Fingerpunkte (`nav/dragKernel.ts`) oder ihr Nachlauf (`nav/fling.ts`). Im Orbit klebt der berührte Boden am Finger, über den Planetenrand hinaus läuft die Umrundung stetig weiter; im Freiflug dreht das Bild nie um seine Mitte — außer beim Zwei-Finger-Drehen (ab 20°, mit Pinch-Sperre und Dominanzprüfung, seit v0.4.8). Alle Gefühlswerte liegen isoliert in `nav/feel.ts` und sind live per URL (`?feel=...`) überschreibbar. Seit v0.4.6 ist `SpaceCamera.ts` unter den Dateideckel geteilt (`cameraTouch.ts` three-frei, `cameraPlacement.ts`). Seit v0.4.13 ist `Engine.ts` unter den Dateideckel geteilt (`EngineHud.ts`, `EngineInput.ts`).
 - Adaptive Renderauflösung (0,7×–2×)
 - Laufzeit-Selbsttest in `Engine`: warnt, wenn die Kamera ohne Schub von ihrem Anker wegdriftet — diagnostiziert Verwechslungen von `dtReal` und `dtSim`
@@ -181,7 +180,7 @@ Freier Flug mit Geschwindigkeit ∝ Distanz zum nächsten Körper; „Goto" als 
 *Abgenommen:* Flug von der Erdoberfläche zum Mond ohne Zielauswahl, jeder Zielwechsel als sichtbarer Flug.
 *Gelernt:* Geschwindigkeit wird ankerrelativ gespeichert, nicht als Weltgeschwindigkeit — sonst verliert die Kamera unter Time-Warp ihren Zielplaneten. Die Referenzhöhe entsteht aus einem gewichteten Boltzmann-Mittel im Log-Raum („Softmin"), nicht aus `logsumexp`; daraus folgt eine Flugzeit, die logarithmisch mit der Referenzhöhe skaliert — skalenfreier Flug. Picking läuft im Winkelraum, nicht im Pixelraum. *Aus v0.4:* Orientierung als Quaternion statt `theta/phi` (sonst Polanschlag und verzerrte Diagonalen); jeder Deckel pro Frame braucht einen Deckel pro Sekunde; wer einen asynchronen Platz belegt, muss ihn auch freigeben, wenn nie eine Antwort kommt. Alle drei v0.4-Fehler waren offline reproduzierbar — sie wurden nur nicht gesucht, weil die Tests ausschließlich bei 60 fps liefen.
 
-**Stufe 2 — Verschachtelte Bezugsrahmen** ✅ *erledigt in v0.5.0*
+**Stufe 2 — Verschachtelte Bezugsrahmen**
 Frame-Baum mit lokalen Ursprüngen; Kamera wird beim Überschreiten von Schwellen umgehängt. Alle Positionen werden relativ zum aktuellen Frame aufgelöst.
 *Fertig, wenn:* eine Sternposition in 100.000 Lj und ein Fels auf der Erde im selben Programmlauf beide korrekt sind — nachweisbar über einen Offline-Test, der Positionen über mehere Frame-Wechsel hin- und zurückrechnet.
 *Risiko:* invasivster Umbau; `SceneManager`, `CelestialBody`, `SpaceCamera`, `UniverseManager` sind betroffen.
@@ -359,7 +358,6 @@ Zu entscheiden, wenn die jeweilige Stufe ansteht:
 | v0.4.13 | Vorbereitung 2b (Aufgabe 03): `Engine.ts` unter den Dateideckel geteilt (496 → 236 Zeilen). HUD-Formatierung in `EngineHud.ts`, Eingabe-Bindung und Zielauswahl in `EngineInput.ts`. `CAP_BASELINE`-Eintrag für `Engine.ts` entfernt. |
 | v0.4.14 | Aufgabe 04: Entscheidungsvorlage Frame-Wechsel-Schwellen in Leitfaden §9 ausgearbeitet (Optionen A, B, C; Empfehlung Option B hierarchisch nach SOI). Nachtrag: Entscheidung für Option B (hierarchisch nach SOI) am 19.10.2026 eingetragen. |
 | v0.4.15 | Stufe 2b (Aufgabe 05): Kamera hängt in Bezugsrahmen um (`SpaceCamera`, `SceneManager`). `updateActiveFrame` mit SOI-Radius und 15 % Hysterese in `src/frames/FrameTree.ts`. HUD-Anzeige des Kameraframes. 12 Offline-Tests in `tools/test-camera-frame.ts`. |
-| v0.5.0 | Stufe 2c (Aufgabe 06): Stufe 2 komplett. `CelestialBody` rechnet Position und Geschwindigkeit lokal im System-Frame. `UniverseManager` baut System-Frames für Katalog und prozedurale Sterne/Planeten. Frame-transformiertes Picking/Targeting in `EngineInput`, Orbitplatzierung/Surface-Clamping in `SpaceCamera` / `cameraPlacement`. 6 Offline-Tests in `tools/test-stage2.ts`. |
 
 ---
 

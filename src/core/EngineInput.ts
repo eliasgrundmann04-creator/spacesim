@@ -7,7 +7,6 @@ import type { CelestialBody } from '../universe/CelestialBody';
 import type { BodyRef } from '../nav/types';
 import type { Vec3 } from '../nav/vec';
 import { pickBody, screenRay, tapTolerance } from '../nav/picking';
-import { transformPoint } from '../frames/FrameTree';
 
 export interface EngineInputCallbacks {
   getCamera: () => SpaceCamera;
@@ -122,20 +121,15 @@ export class EngineInput {
 
   collectBodies(): void {
     const warp = this.cb.clock.paused ? 0 : this.cb.clock.timeWarp;
-    const camFrame = this.camera.frame;
     this.navBodies.length = 0;
     this.byUid.clear();
     for (const b of this.cb.sceneManager.allBodies) {
       this.byUid.set(b.uid, b);
       if (!isFinite3(b.position) || !isFinite3(b.velocity)) continue;
-      let pos = { x: b.position.x, y: b.position.y, z: b.position.z };
-      if (camFrame && b.frame && camFrame !== b.frame) {
-        pos = transformPoint(pos, b.frame, camFrame);
-      }
       this.navBodies.push({
         id: b.uid,
         name: b.name,
-        position: pos,
+        position: { x: b.position.x, y: b.position.y, z: b.position.z },
         radius: b.radius,
         velocity: { x: b.velocity.x * warp, y: b.velocity.y * warp, z: b.velocity.z * warp },
       });
@@ -144,15 +138,10 @@ export class EngineInput {
 
   bodyRef(body: CelestialBody): BodyRef {
     const warp = this.cb.clock.paused ? 0 : this.cb.clock.timeWarp;
-    const camFrame = this.camera.frame;
-    let pos = { x: body.position.x, y: body.position.y, z: body.position.z };
-    if (camFrame && body.frame && camFrame !== body.frame) {
-      pos = transformPoint(pos, body.frame, camFrame);
-    }
     return {
       id: body.uid,
       name: body.name,
-      position: pos,
+      position: { x: body.position.x, y: body.position.y, z: body.position.z },
       radius: body.radius,
       velocity: {
         x: body.velocity.x * warp,
